@@ -150,27 +150,39 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    // FIXED: Load ALL tasks that admin should see
     async function loadTasks() {
         try {
             const response = await fetch(`${API_URL}/tasks/admin`, {
                 headers: getAuthHeaders()
             });
 
-            // If the admin endpoint doesn't exist, fall back to regular tasks endpoint
-            if (response.status === 404) {
+            if (response.ok) {
+                tasks = await response.json();
+            } else if (response.status === 404 || response.status === 403) {
+                // Fall back to regular tasks endpoint
                 const fallbackResponse = await fetch(`${API_URL}/tasks`, {
                     headers: getAuthHeaders()
                 });
-                tasks = await fallbackResponse.json();
+                if (fallbackResponse.ok) {
+                    tasks = await fallbackResponse.json();
+                } else {
+                    throw new Error('Failed to load tasks');
+                }
             } else {
-                tasks = await response.json();
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            // Ensure tasks is always an array
+            if (!Array.isArray(tasks)) {
+                tasks = [];
             }
 
             console.log('Loaded tasks:', tasks.length);
             renderTasksContainer();
         } catch (error) {
             console.error('Error loading tasks:', error);
+            tasks = []; // Ensure tasks is an empty array on error
+            renderTasksContainer(); // Still render to show "no tasks" message
             showMessage('Error loading tasks', 'error');
         }
     }
@@ -234,12 +246,17 @@ document.addEventListener('DOMContentLoaded', function () {
         const container = document.getElementById('tasksContainer');
         container.innerHTML = '';
 
+        if (!Array.isArray(tasks)) {
+            tasks = [];
+        }
+
         console.log('Rendering tasks:', tasks.length);
 
         if (tasks.length === 0) {
             container.innerHTML = '<p style="text-align: center; color: #64748b; padding: 40px;">No tasks found</p>';
             return;
         }
+
 
         // Sort tasks by priority: pending_approval first, then by due date
         const sortedTasks = [...tasks].sort((a, b) => {
@@ -1071,4 +1088,4 @@ document.addEventListener('DOMContentLoaded', function () {
             toast.remove();
         }, 5000);
     }
-});
+}); 

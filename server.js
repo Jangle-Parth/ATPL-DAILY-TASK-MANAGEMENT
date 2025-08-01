@@ -186,7 +186,6 @@ function requireAuth(req, res, next) {
     }
 }
 
-// REPLACE requireAdmin function:
 async function requireAdmin(req, res, next) {
     const token = req.headers.authorization?.split(' ')[1];
 
@@ -198,18 +197,23 @@ async function requireAdmin(req, res, next) {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
         const user = await User.findById(decoded.userId);
 
-        if (!user || (user.role !== 'admin' && user.role !== 'super-admin')) {
+        if (!user || !user.isActive) {
+            return res.status(401).json({ error: 'User not found or inactive' });
+        }
+
+        if (user.role !== 'admin' && user.role !== 'super-admin') {
             return res.status(403).json({ error: 'Admin access required' });
         }
 
         req.userId = decoded.userId;
-        req.userRole = decoded.role;
+        req.userRole = user.role; // Use user.role instead of decoded.role
+        req.user = user; // Add full user object for convenience
         next();
     } catch (error) {
+        console.error('Admin auth error:', error);
         return res.status(401).json({ error: 'Invalid or expired token' });
     }
 }
-
 // // Seed database on startup
 // seedDatabase();
 
@@ -683,9 +687,15 @@ app.get('/api/tasks', requireAuth, async (req, res) => {
     }
 });
 
-app.get('/api/tasks/admin', requireAdmin, async (req, res) => {
+app.get('/api/tasks/admin', requireAuth, async (req, res) => {
     try {
         const user = await User.findById(req.userId);
+
+        // Check if user has admin privileges
+        if (user.role !== 'admin' && user.role !== 'super-admin') {
+            return res.status(403).json({ error: 'Admin access required' });
+        }
+
         let query = {};
 
         if (user.role === 'super-admin') {
