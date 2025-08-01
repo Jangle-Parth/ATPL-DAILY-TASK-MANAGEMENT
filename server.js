@@ -532,10 +532,13 @@ app.post('/api/jobs/upload', upload.single('excel'), async (req, res) => {
                 }
 
                 // Check if job already exists
-                const existingJob = await Job.findOne({ docNo: docNo.toString() });
+                const existingJob = await Job.findOne({
+                    docNo: docNo.toString(),
+                    itemCode: itemCode.toString()
+                });
                 if (existingJob) {
                     errorCount++;
-                    errors.push(`Row ${i + 1}: Job with Doc No ${docNo} already exists`);
+                    errors.push(`Row ${i + 1}: Job with Doc No ${docNo} and Item Code ${itemCode} already exists`);
                     continue;
                 }
 
@@ -639,16 +642,20 @@ app.get('/api/tasks', requireAuth, async (req, res) => {
         let query = {};
 
         if (user.role === 'super-admin') {
-            // Super admin sees all tasks
+            // Super admin sees ALL tasks
             query = {};
         } else if (user.role === 'admin') {
-            // Admin sees tasks assigned to them or created by them, but not super-admin tasks
+            // Admin sees:
+            // 1. All tasks assigned to users (job-auto, admin, user types)
+            // 2. Tasks assigned to them
+            // 3. Tasks created by them
+            // But NOT super-admin tasks
             query = {
                 $or: [
-                    { assignedTo: user._id },
-                    { assignedBy: user._id }
-                ],
-                type: { $ne: 'super-admin' }
+                    { assignedTo: user._id }, // Tasks assigned to admin
+                    { assignedBy: user._id }, // Tasks created by admin
+                    { type: { $in: ['job-auto', 'admin', 'user', 'manual'] } } // All non-super-admin tasks
+                ]
             };
         } else {
             // Regular users see only tasks assigned to them or created by them
@@ -660,16 +667,172 @@ app.get('/api/tasks', requireAuth, async (req, res) => {
             };
         }
 
+        console.log('Task query for', user.role, ':', JSON.stringify(query));
+
         const tasks = await Task.find(query)
             .populate('assignedTo', 'username department')
             .populate('assignedBy', 'username')
-            .populate('jobId', 'docNo customerName')
+            .populate('jobId', 'docNo customerName itemCode')
             .sort({ createdAt: -1 });
 
+        console.log('Found tasks:', tasks.length);
         res.json(tasks);
     } catch (error) {
         console.error('Error fetching tasks:', error);
         res.status(500).json({ error: 'Error fetching tasks' });
+    }
+});
+
+app.get('/api/tasks/admin', requireAdmin, async (req, res) => {
+    try {
+        const user = await User.findById(req.userId);
+        let query = {};
+
+        if (user.role === 'super-admin') {
+            // Super admin sees ALL tasks
+            query = {};
+        } else if (user.role === 'admin') {
+            // Admin sees all tasks except super-admin tasks
+            query = {
+                type: { $ne: 'super-admin' }
+            };
+        }
+
+        const tasks = await Task.find(query)
+            .populate('assignedTo', 'username department')
+            .populate('assignedBy', 'username')
+            .populate('jobId', 'docNo customerName itemCode')
+            .sort({
+                status: 1, // pending_approval first
+                createdAt: -1
+            });
+
+        console.log('Admin tasks loaded:', tasks.length);
+        res.json(tasks);
+    } catch (error) {
+        console.error('Error fetching admin tasks:', error);
+        res.status(500).json({ error: 'Error fetching admin tasks' });
+    }
+});
+
+// ADD: Task rejection endpoint
+app.post('/api/tasks/:id/reject', requireAuth, async (req, res) => {
+    try {
+        const taskId = req.params.id;
+        const { reason } = req.body;
+
+        if (!taskId || taskId === 'undefined' || !taskId.match(/^[0-9a-fA-F]{24}$/)) {
+            return res.status(400).json({ error: 'Invalid task ID' });
+        }
+
+        const task = await Task.findById(taskId);
+
+        if (!task) {
+            return res.status(404).json({ error: 'Task not found' });
+        }
+
+        const user = await User.findById(req.userId);
+
+        // Check rejection permissions
+        if (task.type === 'super-admin' && user.role !== 'super-admin') {
+            return res.status(403).json({ error: 'Only super-admin can reject super-admin tasks' });
+        }
+
+        if (task.status !== 'pending_approval') {
+            return res.status(400).json({ error: 'Only pending approval tasks can be rejected' });
+        }
+
+        task.status = 'pending';
+        task.rejectedAt = new Date();
+        task.rejectedBy = req.userId;
+        task.rejectionReason = reason;
+        task.completedAt = null; // Reset completion timestamp
+
+        await task.save();
+
+        await logActivity('TASK_REJECTED', req.userId, `Rejected task: ${task.title}. Reason: ${reason}`, req);
+        res.json({ success: true, message: 'Task rejected successfully' });
+    } catch (error) {
+        console.error('Error rejecting task:', error);
+        res.status(500).json({ error: 'Error rejecting task' });
+    }
+});
+
+// ADD: Delete task endpoint
+app.delete('/api/tasks/:id', requireAuth, async (req, res) => {
+    try {
+        const taskId = req.params.id;
+
+        if (!taskId || taskId === 'undefined' || !taskId.match(/^[0-9a-fA-F]{24}$/)) {
+            return res.status(400).json({ error: 'Invalid task ID' });
+        }
+
+        const task = await Task.findById(taskId);
+
+        if (!task) {
+            return res.status(404).json({ error: 'Task not found' });
+        }
+
+        const user = await User.findById(req.userId);
+
+        // Check delete permissions - only admin/super-admin or task creator can delete
+        if (user.role !== 'admin' && user.role !== 'super-admin' &&
+            task.assignedBy && task.assignedBy.toString() !== req.userId) {
+            return res.status(403).json({ error: 'Not authorized to delete this task' });
+        }
+
+        await Task.findByIdAndDelete(taskId);
+
+        await logActivity('TASK_DELETED', req.userId, `Deleted task: ${task.title}`, req);
+        res.json({ success: true, message: 'Task deleted successfully' });
+    } catch (error) {
+        console.error('Error deleting task:', error);
+        res.status(500).json({ error: 'Error deleting task' });
+    }
+});
+
+// IMPROVED: Get all tasks for debugging
+app.get('/api/tasks/debug', requireAdmin, async (req, res) => {
+    try {
+        const allTasks = await Task.find()
+            .populate('assignedTo', 'username department role')
+            .populate('assignedBy', 'username role')
+            .populate('jobId', 'docNo customerName')
+            .sort({ createdAt: -1 });
+
+        const taskSummary = allTasks.map(task => ({
+            id: task._id,
+            title: task.title,
+            type: task.type,
+            status: task.status,
+            assignedTo: task.assignedTo?.username || 'Unknown',
+            assignedToRole: task.assignedTo?.role || 'Unknown',
+            assignedBy: task.assignedBy?.username || 'System',
+            assignedByRole: task.assignedBy?.role || 'System',
+            createdAt: task.createdAt,
+            dueDate: task.dueDate
+        }));
+
+        res.json({
+            total: allTasks.length,
+            tasks: taskSummary,
+            byType: {
+                'job-auto': allTasks.filter(t => t.type === 'job-auto').length,
+                'admin': allTasks.filter(t => t.type === 'admin').length,
+                'user': allTasks.filter(t => t.type === 'user').length,
+                'manual': allTasks.filter(t => t.type === 'manual').length,
+                'super-admin': allTasks.filter(t => t.type === 'super-admin').length
+            },
+            byStatus: {
+                'pending': allTasks.filter(t => t.status === 'pending').length,
+                'pending_approval': allTasks.filter(t => t.status === 'pending_approval').length,
+                'completed': allTasks.filter(t => t.status === 'completed').length,
+                'rejected': allTasks.filter(t => t.status === 'rejected').length
+            }
+        });
+    } catch (error) {
+        console.error('Error fetching debug tasks:', error);
+        res.status(500).json({ error: 'Error fetching debug tasks' });
     }
 });
 

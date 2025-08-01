@@ -145,7 +145,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
 
         if (filteredTasks.length === 0) {
-            container.innerHTML = `< p style = "text-align: center; color: #64748b; padding: 40px;" > No ${type} tasks</p > `;
+            container.innerHTML = `<p style = "text-align: center; color: #64748b; padding: 40px;"> No ${type} tasks</p> `;
             return;
         }
 
@@ -466,9 +466,7 @@ document.addEventListener('DOMContentLoaded', function () {
         try {
             const response = await fetch(`${API_URL}/tasks/${taskId}/complete`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: getAuthHeaders(),
                 body: JSON.stringify(completionData)
             });
 

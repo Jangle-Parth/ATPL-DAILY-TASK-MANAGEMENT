@@ -1,3 +1,4 @@
+// REPLACE the entire admin.js content with this fixed version:
 document.addEventListener('DOMContentLoaded', function () {
     let currentUser = null;
     let users = [];
@@ -31,7 +32,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const modals = document.querySelectorAll('.modal');
     const closeButtons = document.querySelectorAll('.close');
 
-
     closeButtons.forEach(btn => {
         btn.addEventListener('click', function () {
             this.closest('.modal').style.display = 'none';
@@ -51,12 +51,18 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('uploadJobsForm').addEventListener('submit', handleUploadJobs);
     document.getElementById('addTaskForm').addEventListener('submit', handleAddTask);
 
-    // Search functionality
+    // Search functionality - ADD support for task search
     document.getElementById('userSearch').addEventListener('input', filterUsers);
     document.getElementById('jobSearch').addEventListener('input', filterJobs);
-    document.getElementById('taskSearch').addEventListener('input', filterTasks);
 
-    // REPLACE the checkAuth function:
+    // Add task search functionality when the element is available
+    setTimeout(() => {
+        const taskSearchInput = document.getElementById('taskSearch');
+        if (taskSearchInput) {
+            taskSearchInput.addEventListener('input', filterTasks);
+        }
+    }, 100);
+
     async function checkAuth() {
         try {
             const token = localStorage.getItem('atpl_auth_token');
@@ -81,6 +87,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
             const result = await response.json();
             if (result.success) {
+                currentUser = result.user;
                 // Update user info display
                 const userInfoElement = document.getElementById('userInfo');
                 if (userInfoElement) {
@@ -118,7 +125,6 @@ document.addEventListener('DOMContentLoaded', function () {
         };
     }
 
-    // UPDATE all fetch calls like this example:
     async function loadUsers() {
         try {
             const response = await fetch(`${API_URL}/users`, {
@@ -144,14 +150,27 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    // FIXED: Load ALL tasks that admin should see
     async function loadTasks() {
         try {
-            const response = await fetch(`${API_URL}/tasks`, {
+            const response = await fetch(`${API_URL}/tasks/admin`, {
                 headers: getAuthHeaders()
             });
-            tasks = await response.json();
+
+            // If the admin endpoint doesn't exist, fall back to regular tasks endpoint
+            if (response.status === 404) {
+                const fallbackResponse = await fetch(`${API_URL}/tasks`, {
+                    headers: getAuthHeaders()
+                });
+                tasks = await fallbackResponse.json();
+            } else {
+                tasks = await response.json();
+            }
+
+            console.log('Loaded tasks:', tasks.length);
             renderTasksContainer();
         } catch (error) {
+            console.error('Error loading tasks:', error);
             showMessage('Error loading tasks', 'error');
         }
     }
@@ -171,7 +190,7 @@ document.addEventListener('DOMContentLoaded', function () {
             if (user.role === 'user') {
                 const row = document.createElement('tr');
                 row.innerHTML = `
-                    <td> ${user.username}</td >
+                    <td>${user.username}</td>
                     <td>${user.email}</td>
                     <td>${user.department}</td>
                     <td><span class="task-status status-completed">${user.role}</span></td>
@@ -193,7 +212,7 @@ document.addEventListener('DOMContentLoaded', function () {
         jobs.forEach(job => {
             const row = document.createElement('tr');
             row.innerHTML = `
-                < td > ${job.docNo}</td >
+                <td>${job.docNo}</td>
                 <td>${job.customerName}</td>
                 <td>${job.itemCode}</td>
                 <td>${job.description}</td>
@@ -210,75 +229,238 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    // FIXED: Render all tasks as individual cards in a grid
     function renderTasksContainer() {
         const container = document.getElementById('tasksContainer');
         container.innerHTML = '';
 
-        // Group tasks by type
-        const taskGroups = {
-            'admin': tasks.filter(t => t.type === 'admin'),
-            'job-auto': tasks.filter(t => t.type === 'job-auto'),
-            'user': tasks.filter(t => t.type === 'user'),
-            'super-admin': tasks.filter(t => t.type === 'super-admin')
-        };
+        console.log('Rendering tasks:', tasks.length);
 
-        Object.entries(taskGroups).forEach(([type, typeTasks]) => {
-            if (typeTasks.length > 0) {
-                const typeHeader = document.createElement('h4');
-                typeHeader.textContent = `${type.charAt(0).toUpperCase() + type.slice(1)} Tasks(${typeTasks.length})`;
-                typeHeader.style.marginBottom = '15px';
-                typeHeader.style.color = '#1e293b';
-                container.appendChild(typeHeader);
+        if (tasks.length === 0) {
+            container.innerHTML = '<p style="text-align: center; color: #64748b; padding: 40px;">No tasks found</p>';
+            return;
+        }
 
-                const typeContainer = document.createElement('div');
-                typeContainer.className = 'tasks-container';
+        // Sort tasks by priority: pending_approval first, then by due date
+        const sortedTasks = [...tasks].sort((a, b) => {
+            // Priority order: pending_approval > pending > completed
+            const statusOrder = {
+                'pending_approval': 0,
+                'pending': 1,
+                'completed': 2,
+                'rejected': 3
+            };
 
-                typeTasks.forEach(task => {
-                    typeContainer.appendChild(createTaskCard(task));
-                });
-
-                container.appendChild(typeContainer);
+            if (statusOrder[a.status] !== statusOrder[b.status]) {
+                return statusOrder[a.status] - statusOrder[b.status];
             }
+
+            // Then sort by due date
+            return new Date(a.dueDate) - new Date(b.dueDate);
         });
+
+        // Create a more compact grid container
+        const gridContainer = document.createElement('div');
+        gridContainer.className = 'admin-tasks-grid';
+        gridContainer.style.cssText = `
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 16px;
+            margin-top: 15px;
+        `;
+
+        sortedTasks.forEach(task => {
+            gridContainer.appendChild(createTaskCard(task));
+        });
+
+        container.appendChild(gridContainer);
+
+        // Compact summary stats at the top
+        const statsContainer = document.createElement('div');
+        statsContainer.style.cssText = `
+            display: flex;
+            gap: 12px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        `;
+
+        const stats = [
+            { label: 'Pending Approval', count: tasks.filter(t => t.status === 'pending_approval').length, color: '#ef4444', icon: '⏳' },
+            { label: 'Pending', count: tasks.filter(t => t.status === 'pending').length, color: '#f59e0b', icon: '📋' },
+            { label: 'Completed', count: tasks.filter(t => t.status === 'completed').length, color: '#10b981', icon: '✅' },
+            { label: 'Total', count: tasks.length, color: '#667eea', icon: '📊' }
+        ];
+
+        stats.forEach(stat => {
+            const statCard = document.createElement('div');
+            statCard.style.cssText = `
+                background: white;
+                padding: 12px 16px;
+                border-radius: 6px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                text-align: center;
+                min-width: 100px;
+                flex: 1;
+                max-width: 150px;
+            `;
+            statCard.innerHTML = `
+                <div style="font-size: 1.25rem; font-weight: bold; color: ${stat.color}; margin-bottom: 2px;">
+                    ${stat.icon} ${stat.count}
+                </div>
+                <div style="font-size: 0.75rem; color: #64748b; line-height: 1.2;">${stat.label}</div>
+            `;
+            statsContainer.appendChild(statCard);
+        });
+
+        container.insertBefore(statsContainer, gridContainer);
     }
 
+    // OPTIMIZED: Compact task card creation with better space utilization
     function createTaskCard(task) {
         const card = document.createElement('div');
-        card.className = `task - card priority - ${task.priority}`;
 
         const dueDate = new Date(task.dueDate);
         const today = new Date();
-        const isOverdue = task.status === 'pending' && dueDate < today;
+        const isOverdue = (task.status === 'pending' || task.status === 'pending_approval') && dueDate < today;
 
         // Handle populated user objects from MongoDB
         const assignedUserName = task.assignedTo?.username || 'Unknown';
+        const assignedUserDept = task.assignedTo?.department || 'Unknown';
         const assignedByUserName = task.assignedBy?.username || 'System';
 
+        // Priority colors
+        const priorityColors = {
+            'low': '#10b981',
+            'medium': '#f59e0b',
+            'high': '#ef4444',
+            'urgent': '#dc2626'
+        };
+
+        // Status colors
+        const statusColors = {
+            'pending': '#f59e0b',
+            'pending_approval': '#3b82f6',
+            'completed': '#10b981',
+            'rejected': '#ef4444'
+        };
+
+        const priorityColor = priorityColors[task.priority] || '#64748b';
+        const statusColor = statusColors[task.status] || '#64748b';
+
+        card.style.cssText = `
+            background: white;
+            border-radius: 8px;
+            padding: 16px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+            border-left: 3px solid ${priorityColor};
+            transition: transform 0.2s, box-shadow 0.2s;
+            position: relative;
+        `;
+
+        card.onmouseenter = () => {
+            card.style.transform = 'translateY(-1px)';
+            card.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.12)';
+        };
+
+        card.onmouseleave = () => {
+            card.style.transform = 'translateY(0)';
+            card.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.08)';
+        };
+
+        // Compact job information
+        const jobInfo = task.docNo ? `
+            <div style="background: #f1f5f9; padding: 6px 8px; border-radius: 4px; margin: 8px 0; font-size: 0.8rem; line-height: 1.3;">
+                <strong>📋 ${task.docNo}</strong> • ${task.customerName} • <strong>${task.itemCode}</strong> (${task.qty})
+                ${task.currentStage ? ` • Stage: ${task.currentStage}` : ''}
+            </div>
+        ` : '';
+
+        // Compact completion/rejection info
+        const statusInfo = (() => {
+            if (task.status === 'completed' && task.completedAt) {
+                return `<div style="background: #f0fdf4; padding: 4px 8px; border-radius: 4px; margin: 6px 0; font-size: 0.75rem; color: #065f46;">
+                    ✅ Completed: ${new Date(task.completedAt).toLocaleDateString()}
+                    ${task.completionRemarks ? ` • ${task.completionRemarks}` : ''}
+                </div>`;
+            } else if (task.status === 'rejected' && task.rejectionReason) {
+                return `<div style="background: #fef2f2; padding: 4px 8px; border-radius: 4px; margin: 6px 0; font-size: 0.75rem; color: #991b1b;">
+                    ❌ Rejected: ${task.rejectionReason}
+                </div>`;
+            }
+            return '';
+        })();
+
         card.innerHTML = `
-            <div class= "task-header" >
-                <div>
-                    <div class="task-title">${task.title}</div>
-                    <div class="task-meta">
-                        Assigned to: ${assignedUserName} | 
-                        By: ${assignedByUserName} |
-                        Priority: ${task.priority.toUpperCase()}
+            <!-- Compact Header -->
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
+                <div style="flex: 1; min-width: 0;">
+                    <h4 style="color: #1e293b; margin: 0 0 4px 0; font-size: 1rem; font-weight: 600; line-height: 1.3; overflow: hidden; text-overflow: ellipsis;">
+                        ${task.title}
+                    </h4>
+                    <div style="font-size: 0.75rem; color: #64748b; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                        <span>👤 <strong>${assignedUserName}</strong></span>
+                        <span style="color: ${priorityColor}; font-weight: 600;">🏷️ ${task.priority.toUpperCase()}</span>
+                        <span>📁 ${task.type.toUpperCase()}</span>
                     </div>
                 </div>
-                <span class="task-status ${isOverdue ? 'status-overdue' : 'status-' + task.status}">
-                    ${isOverdue ? 'Overdue' : task.status.replace('_', ' ').toUpperCase()}
-                </span>
-            </div >
-            <div class="task-description">${task.description}</div>
-            <div class="task-footer">
-                <small>Due: ${dueDate.toLocaleDateString()}</small>
-                <div class="task-actions">
-                    ${task.status === 'pending_approval' ?
-                `<button class="btn-small btn-success" onclick="approveTask('${task._id}')">Approve</button>` : ''}
-                    <button class="btn-small btn-primary" onclick="editTask('${task._id}')">Edit</button>
-                    <button class="btn-small btn-danger" onclick="deleteTask('${task._id}')">Delete</button>
+                <div style="flex-shrink: 0; margin-left: 10px;">
+                    <span style="
+                        padding: 3px 8px; 
+                        border-radius: 12px; 
+                        font-size: 0.7rem; 
+                        font-weight: 600;
+                        background: ${statusColor}15;
+                        color: ${statusColor};
+                        border: 1px solid ${statusColor}30;
+                        white-space: nowrap;
+                        display: inline-block;
+                    ">
+                        ${isOverdue ? '⚠️ OVERDUE' : task.status.replace('_', ' ').toUpperCase()}
+                    </span>
                 </div>
             </div>
-            `;
+
+            <!-- Compact Description -->
+            <div style="color: #475569; margin-bottom: 10px; font-size: 0.85rem; line-height: 1.4; 
+                        display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                ${task.description}
+            </div>
+
+            ${jobInfo}
+            ${statusInfo}
+
+            <!-- Compact Footer -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 12px; padding-top: 10px; border-top: 1px solid #f1f5f9;">
+                <div style="font-size: 0.75rem; color: #64748b; display: flex; align-items: center; gap: 10px;">
+                    <span>📅 ${dueDate.toLocaleDateString()}</span>
+                    ${isOverdue ? '<span style="color: #ef4444; font-weight: 600;">⚠️ Overdue</span>' : ''}
+                </div>
+                <div style="display: flex; gap: 4px;">
+                    ${task.status === 'pending_approval' ? `
+                        <button onclick="approveTask('${task._id}')" 
+                                style="background: #10b981; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.7rem; font-weight: 500;">
+                            ✓
+                        </button>
+                        <button onclick="rejectTask('${task._id}')" 
+                                style="background: #ef4444; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.7rem; font-weight: 500;">
+                            ✗
+                        </button>
+                    ` : ''}
+                    <button onclick="viewTaskDetails('${task._id}')" 
+                            style="background: #3b82f6; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.7rem; font-weight: 500;">
+                        👁️
+                    </button>
+                    <button onclick="editTask('${task._id}')" 
+                            style="background: #8b5cf6; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.7rem; font-weight: 500;">
+                        ✏️
+                    </button>
+                    <button onclick="deleteTask('${task._id}')" 
+                            style="background: #6b7280; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.7rem; font-weight: 500;">
+                        🗑️
+                    </button>
+                </div>
+            </div>
+        `;
 
         return card;
     }
@@ -304,9 +486,7 @@ document.addEventListener('DOMContentLoaded', function () {
         try {
             const response = await fetch(`${API_URL}/users`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: getAuthHeaders(),
                 body: JSON.stringify(userData)
             });
 
@@ -334,9 +514,7 @@ document.addEventListener('DOMContentLoaded', function () {
         try {
             const response = await fetch(`${API_URL}/jobs`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: getAuthHeaders(),
                 body: JSON.stringify(jobData)
             });
 
@@ -367,37 +545,13 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
-        // Validate file type
-        const file = fileInput.files[0];
-        const validTypes = [
-            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            'application/vnd.ms-excel'
-        ];
-        const validExtensions = ['.xlsx', '.xls'];
-
-        const isValidType = validTypes.includes(file.type) ||
-            validExtensions.some(ext => file.name.toLowerCase().endsWith(ext));
-
-        if (!isValidType) {
-            showMessage('Please select a valid Excel file (.xlsx or .xls)', 'error');
-            return;
-        }
-
         try {
-            // Get auth token
-            const token = localStorage.getItem('atpl_auth_token');
-            if (!token) {
-                showMessage('Authentication required', 'error');
-                return;
-            }
-
             showMessage('Uploading file...', 'info');
 
             const response = await fetch(`${API_URL}/jobs/upload`, {
                 method: 'POST',
                 headers: {
-                    'Authorization': `Bearer ${token}`
-
+                    'Authorization': `Bearer ${localStorage.getItem('atpl_auth_token')}`
                 },
                 body: formData
             });
@@ -411,7 +565,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 loadJobs();
                 loadTasks();
 
-                // Show detailed results if there were errors
                 if (result.errorCount > 0) {
                     console.log('Upload errors:', result.errors);
                     setTimeout(() => {
@@ -439,9 +592,7 @@ document.addEventListener('DOMContentLoaded', function () {
         try {
             const response = await fetch(`${API_URL}/tasks`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: getAuthHeaders(),
                 body: JSON.stringify(taskData)
             });
 
@@ -460,28 +611,53 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    // Global functions for inline event handlers
+    // FIXED: Improved task approval function
     window.approveTask = async function (taskId) {
         if (!confirm('Are you sure you want to approve this task?')) return;
 
         try {
             const response = await fetch(`${API_URL}/tasks/${taskId}/approve`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                }
+                headers: getAuthHeaders()
             });
 
             const result = await response.json();
 
             if (result.success) {
                 showMessage('Task approved successfully', 'success');
+                loadTasks(); // Reload to update UI
+            } else {
+                showMessage(result.error, 'error');
+            }
+        } catch (error) {
+            console.error('Error approving task:', error);
+            showMessage('Error approving task', 'error');
+        }
+    };
+
+    // NEW: Add reject task function
+    window.rejectTask = async function (taskId) {
+        const reason = prompt('Please provide a reason for rejection:');
+        if (!reason) return;
+
+        try {
+            const response = await fetch(`${API_URL}/tasks/${taskId}/reject`, {
+                method: 'POST',
+                headers: getAuthHeaders(),
+                body: JSON.stringify({ reason })
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                showMessage('Task rejected successfully', 'success');
                 loadTasks();
             } else {
                 showMessage(result.error, 'error');
             }
         } catch (error) {
-            showMessage('Error approving task', 'error');
+            console.error('Error rejecting task:', error);
+            showMessage('Error rejecting task', 'error');
         }
     };
 
@@ -489,9 +665,56 @@ document.addEventListener('DOMContentLoaded', function () {
         showMessage('Edit functionality coming soon', 'info');
     };
 
-    window.deleteTask = function (taskId) {
-        if (confirm('Are you sure you want to delete this task?')) {
-            showMessage('Delete functionality coming soon', 'info');
+    // IMPROVED: Better task details view
+    window.viewTaskDetails = async function (taskId) {
+        try {
+            const response = await fetch(`${API_URL}/tasks/${taskId}`, {
+                headers: getAuthHeaders()
+            });
+
+            const task = await response.json();
+
+            if (task.error) {
+                showMessage(task.error, 'error');
+                return;
+            }
+
+            // Create a detailed modal or popup
+            const details = `
+                Task: ${task.title}
+                Description: ${task.description}
+                Assigned To: ${task.assignedTo?.username || 'Unknown'}
+                Priority: ${task.priority}
+                Status: ${task.status}
+                Due Date: ${new Date(task.dueDate).toLocaleDateString()}
+                ${task.completionRemarks ? '\nRemarks: ' + task.completionRemarks : ''}
+            `;
+
+            alert(details); // Simple popup for now
+        } catch (error) {
+            showMessage('Error loading task details', 'error');
+        }
+    };
+
+    window.deleteTask = async function (taskId) {
+        if (!confirm('Are you sure you want to delete this task?')) return;
+
+        try {
+            const response = await fetch(`${API_URL}/tasks/${taskId}`, {
+                method: 'DELETE',
+                headers: getAuthHeaders()
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                showMessage('Task deleted successfully', 'success');
+                loadTasks();
+            } else {
+                showMessage(result.error, 'error');
+            }
+        } catch (error) {
+            showMessage('Error deleting task', 'error');
         }
     };
 
@@ -510,12 +733,19 @@ document.addEventListener('DOMContentLoaded', function () {
     };
 
     window.viewJobTasks = function (jobId) {
-        const jobTasks = tasks.filter(t => t.jobId === jobId || (t.jobId && t.jobId._id === jobId));
+        const jobTasks = tasks.filter(t =>
+            t.jobId === jobId ||
+            (t.jobId && t.jobId._id === jobId) ||
+            (t.jobId && t.jobId.toString() === jobId)
+        );
+
         if (jobTasks.length === 0) {
             showMessage('No tasks found for this job', 'info');
             return;
         }
-        showMessage(`Found ${jobTasks.length} tasks for this job`, 'info');
+
+        console.log('Job tasks:', jobTasks);
+        showMessage(`Found ${jobTasks.length} tasks for this job. Check console for details.`, 'info');
     };
 
     function filterUsers() {
@@ -538,14 +768,210 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    // Enhanced task filtering with multiple options
     function filterTasks() {
-        const searchTerm = document.getElementById('taskSearch').value.toLowerCase();
-        const taskCards = document.querySelectorAll('#tasksContainer .task-card');
+        const searchInput = document.getElementById('taskSearch');
+        if (!searchInput) {
+            console.log('Task search input not found');
+            return;
+        }
+
+        const searchTerm = searchInput.value.toLowerCase();
+        const taskCards = document.querySelectorAll('.admin-tasks-grid > div');
+
+        let visibleCount = 0;
 
         taskCards.forEach(card => {
             const text = card.textContent.toLowerCase();
-            card.style.display = text.includes(searchTerm) ? '' : 'none';
+            const isVisible = text.includes(searchTerm);
+            card.style.display = isVisible ? '' : 'none';
+            if (isVisible) visibleCount++;
         });
+
+        // Update search results info
+        updateSearchResultsInfo(searchTerm, visibleCount, tasks.length);
+    }
+
+    // Add search results information
+    function updateSearchResultsInfo(searchTerm, visibleCount, totalCount) {
+        let resultInfo = document.getElementById('searchResultInfo');
+
+        if (!resultInfo) {
+            resultInfo = document.createElement('div');
+            resultInfo.id = 'searchResultInfo';
+            resultInfo.style.cssText = `
+                background: #f8fafc;
+                padding: 10px 15px;
+                border-radius: 6px;
+                margin: 10px 0;
+                font-size: 0.9rem;
+                color: #64748b;
+                border-left: 3px solid #3b82f6;
+            `;
+
+            const searchBar = document.querySelector('#tasks .search-bar');
+            if (searchBar) {
+                searchBar.appendChild(resultInfo);
+            }
+        }
+
+        if (searchTerm) {
+            resultInfo.textContent = `Showing ${visibleCount} of ${totalCount} tasks matching "${searchTerm}"`;
+            resultInfo.style.display = 'block';
+        } else {
+            resultInfo.style.display = 'none';
+        }
+    }
+
+    // Add compact task filtering buttons
+    function addTaskFilters() {
+        const tasksSection = document.getElementById('tasks');
+        const existingFilters = document.getElementById('taskFilters');
+
+        if (existingFilters) {
+            existingFilters.remove();
+        }
+
+        const filtersContainer = document.createElement('div');
+        filtersContainer.id = 'taskFilters';
+        filtersContainer.style.cssText = `
+            display: flex;
+            gap: 6px;
+            margin: 10px 0;
+            flex-wrap: wrap;
+            align-items: center;
+        `;
+
+        const filterLabel = document.createElement('span');
+        filterLabel.textContent = 'Filter by:';
+        filterLabel.style.cssText = 'font-weight: 600; color: #374151; margin-right: 8px; font-size: 0.9rem;';
+        filtersContainer.appendChild(filterLabel);
+
+        const filters = [
+            { label: 'All', value: 'all' },
+            { label: 'Pending Approval', value: 'pending_approval' },
+            { label: 'Pending', value: 'pending' },
+            { label: 'Completed', value: 'completed' },
+            { label: 'Job Auto', value: 'job-auto' },
+            { label: 'Admin Tasks', value: 'admin' },
+            { label: 'User Tasks', value: 'user' }
+        ];
+
+        filters.forEach((filter, index) => {
+            const button = document.createElement('button');
+            button.textContent = filter.label;
+            button.onclick = () => filterTasksByType(filter.value, button);
+            button.style.cssText = `
+                padding: 4px 10px;
+                border: 1px solid #d1d5db;
+                background: ${index === 0 ? '#667eea' : 'white'};
+                color: ${index === 0 ? 'white' : '#374151'};
+                border-radius: 16px;
+                cursor: pointer;
+                font-size: 0.75rem;
+                font-weight: 500;
+                transition: all 0.2s;
+            `;
+
+            if (index === 0) {
+                button.classList.add('active');
+            }
+
+            button.onmouseenter = () => {
+                if (!button.classList.contains('active')) {
+                    button.style.background = '#f3f4f6';
+                }
+            };
+
+            button.onmouseleave = () => {
+                if (!button.classList.contains('active')) {
+                    button.style.background = 'white';
+                }
+            };
+
+            filtersContainer.appendChild(button);
+        });
+
+        const searchBar = document.querySelector('#tasks .search-bar');
+        if (searchBar) {
+            searchBar.parentNode.insertBefore(filtersContainer, searchBar.nextSibling);
+        }
+    }
+
+    // Filter tasks by type/status
+    function filterTasksByType(filterValue, activeButton) {
+        // Update active button styling
+        const allFilterButtons = document.querySelectorAll('#taskFilters button');
+        allFilterButtons.forEach(btn => {
+            btn.style.background = 'white';
+            btn.style.color = '#374151';
+            btn.classList.remove('active');
+        });
+
+        activeButton.style.background = '#667eea';
+        activeButton.style.color = 'white';
+        activeButton.classList.add('active');
+
+        // Filter task cards
+        const taskCards = document.querySelectorAll('.admin-tasks-grid > div');
+        let visibleCount = 0;
+
+        taskCards.forEach(card => {
+            const taskText = card.textContent.toLowerCase();
+            let isVisible = true;
+
+            if (filterValue !== 'all') {
+                if (filterValue === 'pending_approval') {
+                    isVisible = taskText.includes('pending approval');
+                } else if (filterValue === 'pending') {
+                    isVisible = taskText.includes('pending') && !taskText.includes('pending approval');
+                } else if (filterValue === 'completed') {
+                    isVisible = taskText.includes('completed');
+                } else if (filterValue === 'job-auto') {
+                    isVisible = taskText.includes('job-auto');
+                } else if (filterValue === 'admin') {
+                    isVisible = taskText.includes('type: admin');
+                } else if (filterValue === 'user') {
+                    isVisible = taskText.includes('type: user') || taskText.includes('type: manual');
+                }
+            }
+
+            card.style.display = isVisible ? '' : 'none';
+            if (isVisible) visibleCount++;
+        });
+
+        // Update filter results info
+        updateFilterResultsInfo(filterValue, visibleCount, tasks.length);
+    }
+
+    function updateFilterResultsInfo(filterValue, visibleCount, totalCount) {
+        let resultInfo = document.getElementById('filterResultInfo');
+
+        if (!resultInfo) {
+            resultInfo = document.createElement('div');
+            resultInfo.id = 'filterResultInfo';
+            resultInfo.style.cssText = `
+                background: #eff6ff;
+                padding: 8px 12px;
+                border-radius: 6px;
+                margin: 10px 0;
+                font-size: 0.85rem;
+                color: #1e40af;
+                border-left: 3px solid #3b82f6;
+            `;
+
+            const filtersContainer = document.getElementById('taskFilters');
+            if (filtersContainer) {
+                filtersContainer.parentNode.insertBefore(resultInfo, filtersContainer.nextSibling);
+            }
+        }
+
+        if (filterValue !== 'all') {
+            resultInfo.textContent = `📊 Showing ${visibleCount} ${filterValue.replace('_', ' ')} tasks of ${totalCount} total`;
+            resultInfo.style.display = 'block';
+        } else {
+            resultInfo.style.display = 'none';
+        }
     }
 
     function loadSectionData(section) {
@@ -561,6 +987,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 break;
             case 'tasks':
                 loadTasks();
+                // Add task filters after loading tasks
+                setTimeout(() => {
+                    addTaskFilters();
+                }, 100);
                 break;
             case 'analytics':
                 loadAnalytics();
@@ -581,15 +1011,14 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function renderAnalytics(analytics) {
-        // Simple analytics rendering
         const charts = document.querySelectorAll('.chart-container');
         charts.forEach(chart => {
             chart.innerHTML = `
-                <div style = "text-align: center;" >
+                <div style="text-align: center;">
                     <p>Analytics data loaded</p>
                     <p>${analytics.length} users analyzed</p>
-                </div >
-                `;
+                </div>
+            `;
         });
     }
 
@@ -620,27 +1049,26 @@ document.addEventListener('DOMContentLoaded', function () {
     };
 
     function showMessage(message, type = 'info') {
-        // Create toast notification
         const toast = document.createElement('div');
-        toast.className = `toast toast - ${type}`;
+        toast.className = `toast toast-${type}`;
         toast.textContent = message;
         toast.style.cssText = `
             position: fixed;
             top: 20px;
             right: 20px;
             padding: 15px 20px;
-            background: ${type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : '#3b82f6'};
+            background: ${type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : type === 'warning' ? '#f59e0b' : '#3b82f6'};
             color: white;
-            border - radius: 8px;
-            box - shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            z - index: 1001;
-            max - width: 300px;
-            `;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            z-index: 1001;
+            max-width: 300px;
+        `;
 
         document.body.appendChild(toast);
 
         setTimeout(() => {
             toast.remove();
-        }, 3000);
+        }, 5000);
     }
 });
