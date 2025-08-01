@@ -484,6 +484,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function populateUserDropdowns() {
         const dropdown = document.getElementById('taskAssignTo');
+        if (!dropdown) return;
+
         dropdown.innerHTML = '<option value="">Select User</option><option value="self">Self</option>';
 
         users.filter(u => u.role === 'user').forEach(user => {
@@ -1087,5 +1089,51 @@ document.addEventListener('DOMContentLoaded', function () {
         setTimeout(() => {
             toast.remove();
         }, 5000);
+    }
+
+    async function handleAddTask(e) {
+        e.preventDefault();
+
+        const formData = new FormData(e.target);
+
+        // Get selected users from the multiple select
+        const assignToSelect = document.getElementById('taskAssignTo');
+        const selectedUsers = Array.from(assignToSelect.selectedOptions).map(option => option.value);
+
+        if (selectedUsers.length === 0) {
+            showMessage('Please select at least one user to assign the task', 'error');
+            return;
+        }
+
+        const taskData = {
+            title: formData.get('title'),
+            description: formData.get('description'),
+            assignedTo: selectedUsers.includes('self') ?
+                selectedUsers.map(id => id === 'self' ? currentUser.id : id) :
+                selectedUsers,
+            priority: formData.get('priority'),
+            dueDate: formData.get('dueDate')
+        };
+
+        try {
+            const response = await fetch(`${API_URL}/tasks`, {
+                method: 'POST',
+                headers: getAuthHeaders(),
+                body: JSON.stringify(taskData)
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                showMessage('Task created successfully', 'success');
+                closeModal('addTaskModal');
+                e.target.reset();
+                loadTasks();
+            } else {
+                showMessage(result.error, 'error');
+            }
+        } catch (error) {
+            showMessage('Error creating task', 'error');
+        }
     }
 }); 

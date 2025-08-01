@@ -3,6 +3,7 @@ document.addEventListener('DOMContentLoaded', function () {
     let tasks = [];
     let searchResults = [];
     const API_URL = 'http://localhost:3000/api';
+    let users = [];
 
 
     // Check authentication
@@ -34,6 +35,8 @@ document.addEventListener('DOMContentLoaded', function () {
             performUniversalSearch();
         }
     });
+    document.getElementById('assignPeerTaskBtn').addEventListener('click', () => openModal('assignPeerTaskModal'));
+
 
     // REPLACE the checkAuth function:
     async function checkAuth() {
@@ -60,12 +63,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
             const result = await response.json();
             if (result.success) {
+                currentUser = result.user;
                 // Update user info display
                 const userInfoElement = document.getElementById('userInfo');
                 if (userInfoElement) {
                     userInfoElement.textContent = `${result.user.username} (${result.user.role})`;
                 }
-                loadDashboard();
+                await loadDashboard();
+                await loadUsers();
             }
         } catch (error) {
             console.error('Auth check error:', error);
@@ -74,6 +79,92 @@ document.addEventListener('DOMContentLoaded', function () {
             window.location.href = '/';
         }
     }
+
+    async function loadUsers() {
+        try {
+            console.log('Loading colleagues...');
+
+
+            const response = await fetch(`${API_URL}/users/colleagues`, {
+                headers: getAuthHeaders()
+            });
+
+            console.log('Colleagues response status:', response.status);
+
+            if (response.ok) {
+                users = await response.json();
+                console.log('Loaded colleagues:', users);
+
+                if (users.length === 0) {
+                    console.warn('No colleagues found! This might be because:');
+                    console.warn('1. No other users exist in your department');
+                    console.warn('2. All other users are inactive');
+                    console.warn('3. You are the only user in the system');
+                    console.warn('4. Department names do not match exactly');
+                }
+
+                populatePeerDropdown();
+            } else {
+                const errorText = await response.text();
+                console.error('Failed to load colleagues:', response.status, errorText);
+                showMessage('Failed to load colleagues: ' + response.status, 'error');
+            }
+        } catch (error) {
+            console.error('Error loading colleagues:', error);
+            showMessage('Error loading colleagues: ' + error.message, 'error');
+        }
+    }
+
+    // UPDATED populatePeerDropdown with more debugging
+    function populatePeerDropdown() {
+        const dropdown = document.getElementById('peerTaskAssignTo');
+        if (!dropdown) {
+            console.error('Peer dropdown not found!');
+            return;
+        }
+
+        console.log('Populating dropdown with users:', users.length);
+
+        // Clear existing options
+        dropdown.innerHTML = '';
+
+        // Add placeholder option
+        const placeholderOption = document.createElement('option');
+        placeholderOption.value = '';
+        placeholderOption.textContent = 'Select colleagues...';
+        placeholderOption.disabled = true;
+        placeholderOption.selected = true;
+        dropdown.appendChild(placeholderOption);
+
+        if (users.length === 0) {
+            const noUsersOption = document.createElement('option');
+            noUsersOption.value = '';
+            noUsersOption.textContent = 'No colleagues available';
+            noUsersOption.disabled = true;
+            dropdown.appendChild(noUsersOption);
+
+            console.warn('No colleagues to populate in dropdown');
+
+            // Show helpful message to user
+            showMessage('No colleagues found. This may be because you are the only user in your department, or no other users exist.', 'info');
+            return;
+        }
+
+        // Add user options
+        users.forEach(user => {
+            const option = document.createElement('option');
+            option.value = user._id;
+            option.textContent = `${user.username} (${user.department})`;
+            dropdown.appendChild(option);
+            console.log('Added option:', user.username, user.department);
+        });
+
+        console.log('Dropdown populated with', dropdown.options.length - 1, 'colleagues');
+    }
+
+
+
+
 
     async function loadDashboard() {
         try {
@@ -225,6 +316,8 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    // In user.js - Update createTaskCard to show job description for job-auto tasks
+
     function createTaskCard(task) {
         const card = document.createElement('div');
         card.className = `task-card priority-${task.priority}`;
@@ -233,24 +326,58 @@ document.addEventListener('DOMContentLoaded', function () {
         const today = new Date();
         const isOverdue = task.status === 'pending' && dueDate < today;
 
+        // Handle assignee display (works for both single and multiple)
+        const assigneeNames = Array.isArray(task.assignedTo) ?
+            task.assignedTo.map(user => user.username || 'Unknown').join(', ') :
+            (task.assignedTo?.username || 'Unknown');
+
+        // Show job description prominently for job-auto tasks
+        const jobDescription = task.type === 'job-auto' && task.jobDetails?.description ? `
+        <div style="background: #eff6ff; padding: 12px; border-radius: 6px; margin: 10px 0; border-left: 4px solid #3b82f6;">
+            <div style="font-weight: 600; color: #1e40af; margin-bottom: 6px; font-size: 0.9rem;">
+                📋 Job Description:
+            </div>
+            <div style="color: #1e40af; font-size: 0.85rem; line-height: 1.4;">
+                ${task.jobDetails.description}
+            </div>
+            <div style="margin-top: 6px; font-size: 0.75rem; color: #64748b;">
+                Doc: ${task.jobDetails.docNo} | Item: ${task.jobDetails.itemCode} | Qty: ${task.jobDetails.qty}
+            </div>
+        </div>
+    ` : '';
+
+        // Show completion status for multi-assignee tasks
+        const currentUser = getCurrentUser();
+        const multiAssigneeStatus = task.assignedTo.length > 1 ? `
+        <div style="background: #f8fafc; padding: 6px 8px; border-radius: 4px; margin: 6px 0; font-size: 0.75rem; color: #64748b;">
+            👥 Multi-assignee task: ${task.individualCompletions?.length || 0}/${task.assignedTo.length} completed
+            ${task.individualCompletions?.some(comp => comp.userId === currentUser?.id) ? ' (✅ You completed)' : ''}
+        </div>
+    ` : '';
+
         card.innerHTML = `
         <div class="task-header">
             <div>
                 <div class="task-title">${task.title}</div>
                 <div class="task-meta">
                     Type: ${task.type.toUpperCase()} | Priority: ${task.priority.toUpperCase()}
-                    ${task.docNo ? `| Doc: ${task.docNo}` : ''}
+                    ${task.type === 'job-auto' ? `| Stage: ${task.jobDetails?.currentStage || 'N/A'}` : ''}
                 </div>
             </div>
             <span class="task-status ${isOverdue ? 'status-overdue' : 'status-' + task.status}">
                 ${isOverdue ? 'Overdue' : task.status.replace('_', ' ').toUpperCase()}
             </span>
         </div>
+        
         <div class="task-description">${task.description}</div>
+        
+        ${jobDescription}
+        ${multiAssigneeStatus}
+        
         <div class="task-footer">
             <small>Due: ${dueDate.toLocaleDateString()}</small>
             <div class="task-actions">
-                ${task.status === 'pending' ?
+                ${task.status === 'pending' && !task.individualCompletions?.some(comp => comp.userId === currentUser?.id) ?
                 `<button class="btn-small btn-success" onclick="completeTask('${task._id}')">Complete</button>` : ''}
                 <button class="btn-small btn-primary" onclick="viewTaskDetails('${task._id}')">Details</button>
             </div>
@@ -258,6 +385,12 @@ document.addEventListener('DOMContentLoaded', function () {
     `;
 
         return card;
+    }
+
+    // Add function to get current user
+    function getCurrentUser() {
+        const userInfo = localStorage.getItem('atpl_user_info');
+        return userInfo ? JSON.parse(userInfo) : null;
     }
 
     // Fix 2: Update renderGroupedTasks function in user.js
@@ -485,6 +618,53 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
+    document.getElementById('assignPeerTaskForm').addEventListener('submit', async function (e) {
+        e.preventDefault();
+
+        const formData = new FormData(e.target);
+
+        // Get selected users from the multiple select
+        const assignToSelect = document.getElementById('peerTaskAssignTo');
+        const selectedUsers = Array.from(assignToSelect.selectedOptions).map(option => option.value);
+
+        if (selectedUsers.length === 0) {
+            showMessage('Please select at least one colleague to assign the task', 'error');
+            return;
+        }
+
+        const taskData = {
+            title: formData.get('title'),
+            description: formData.get('description'),
+            assignedTo: selectedUsers, // This is the key - send as array
+            priority: formData.get('priority'),
+            dueDate: formData.get('dueDate')
+        };
+
+        console.log('Assigning task to:', selectedUsers); // Debug log
+
+        try {
+            const response = await fetch(`${API_URL}/tasks/assign-peer`, {
+                method: 'POST',
+                headers: getAuthHeaders(),
+                body: JSON.stringify(taskData)
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                showMessage('Task assigned successfully to colleagues', 'success');
+                closeModal('assignPeerTaskModal');
+                e.target.reset();
+                loadTasks(); // Reload tasks to show the new assignment
+            } else {
+                showMessage(result.error, 'error');
+            }
+        } catch (error) {
+            console.error('Error assigning task:', error);
+            showMessage('Error assigning task to colleagues', 'error');
+        }
+    });
+
     function loadSectionData(section) {
         switch (section) {
             case 'all-tasks':
@@ -615,12 +795,23 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function openModal(modalId) {
+        // If opening the peer task modal, ensure users are loaded
+        if (modalId === 'assignPeerTaskModal') {
+            if (users.length === 0) {
+                console.log('Users not loaded, loading now...');
+                loadUsers().then(() => {
+                    document.getElementById(modalId).style.display = 'block';
+                });
+                return;
+            }
+        }
         document.getElementById(modalId).style.display = 'block';
     }
 
     window.closeModal = function (modalId) {
         document.getElementById(modalId).style.display = 'none';
     };
+    window.openModal = openModal;
 
     function showMessage(message, type = 'info') {
         const toast = document.createElement('div');

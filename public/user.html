@@ -20,6 +20,7 @@
                 <button class="nav-btn" data-section="user-assigned">User Assigned</button>
                 <button class="nav-btn" data-section="due-dates">Due Dates</button>
                 <button class="nav-btn" data-section="analytics">Analytics</button>
+                <button id="assignPeerTaskBtn" class="btn btn-secondary" style="margin-left: 20px;">Assign Task to Collegue</button>
             </nav>
             <div class="user-info">
                 <span id="userInfo"></span>
@@ -111,6 +112,52 @@
             </section>
         </main>
     </div>
+
+    <div id="assignPeerTaskModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Assign Task to Colleague</h3>
+            <span class="close">&times;</span>
+        </div>
+        <form id="assignPeerTaskForm" class="modal-form">
+            <div class="form-group">
+                <label for="peerTaskTitle">Task Title</label>
+                <input type="text" id="peerTaskTitle" name="title" required>
+            </div>
+            <div class="form-group">
+                <label for="peerTaskDescription">Description</label>
+                <textarea id="peerTaskDescription" name="description" required></textarea>
+            </div>
+            <div class="form-group">
+                <label for="peerTaskAssignTo">Assign To (Hold Ctrl/Cmd to select multiple)</label>
+                <select id="peerTaskAssignTo" name="assignedTo" multiple required>
+                    <!-- Options will be populated by JavaScript -->
+                </select>
+                <small>Hold Ctrl/Cmd to select multiple colleagues</small>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="peerTaskPriority">Priority</label>
+                    <select id="peerTaskPriority" name="priority" required>
+                        <option value="">Select Priority</option>
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                        <option value="urgent">Urgent</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="peerTaskDueDate">Due Date</label>
+                    <input type="date" id="peerTaskDueDate" name="dueDate" required>
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('assignPeerTaskModal')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Assign Task</button>
+            </div>
+        </form>
+    </div>
+</div>
 
     <!-- Task Completion Modal -->
     <div id="completeTaskModal" class="modal">

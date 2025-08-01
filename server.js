@@ -144,19 +144,21 @@ async function createAutoTask(job, status, assignedToId) {
         const taskData = {
             title: flowInfo.nextTask,
             description: `Auto-generated task for Job ${job.docNo} - ${job.customerName}`,
-            assignedTo: assignedToId,
+            assignedTo: [assignedToId],
             assignedBy: null, // System generated
             priority: 'medium',
             status: 'pending',
             type: 'job-auto',
             jobId: job._id,
-            docNo: job.docNo,
-            customerName: job.customerName,
-            itemCode: job.itemCode,
-            qty: job.qty,
-            jobDescription: job.description,
-            currentStage: flowInfo.stage,
-            nextStage: flowInfo.next,
+            jobDetails: {
+                docNo: job.docNo,
+                customerName: job.customerName,
+                itemCode: job.itemCode,
+                description: job.description, // THIS IS THE KEY ADDITION
+                qty: job.qty,
+                currentStage: flowInfo.stage,
+                nextStage: flowInfo.next
+            },
             dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days from now
         };
 
@@ -847,6 +849,8 @@ app.get('/api/tasks/debug', requireAdmin, async (req, res) => {
     }
 });
 
+// In server.js - Update ONLY manual task creation to support multiple assignees
+
 app.post('/api/tasks', requireAuth, async (req, res) => {
     try {
         const { title, description, assignedTo, priority, dueDate, type = 'manual' } = req.body;
@@ -856,24 +860,32 @@ app.post('/api/tasks', requireAuth, async (req, res) => {
             return res.status(400).json({ error: 'All fields are required' });
         }
 
-
+        // Handle multiple assignees ONLY for manual tasks
+        let assigneeIds = [];
+        if (Array.isArray(assignedTo)) {
+            assigneeIds = assignedTo.map(id => id === 'self' ? req.userId : id);
+        } else {
+            assigneeIds = [assignedTo === 'self' ? req.userId : assignedTo];
+        }
 
         const taskData = {
             title,
             description,
-            assignedTo: assignedTo === 'self' ? req.userId : assignedTo,
+            assignedTo: assigneeIds, // Multiple assignees for manual tasks
             assignedBy: req.userId,
             priority,
             status: 'pending',
             type: user.role === 'super-admin' ? 'super-admin' : (user.role === 'admin' ? 'admin' : 'user'),
             dueDate: new Date(dueDate),
-            attachments: []
+            attachments: [],
+            individualCompletions: assigneeIds.length > 1 ? [] : undefined // Only for multi-assignee
         };
 
         const task = await Task.create(taskData);
 
-        const assignedUser = await User.findById(task.assignedTo);
-        await logActivity('TASK_CREATED', req.userId, `Created task: ${title} for ${assignedUser?.username}`, req);
+        const assignedUsers = await User.find({ _id: { $in: assigneeIds } });
+        const usernames = assignedUsers.map(u => u.username).join(', ');
+        await logActivity('TASK_CREATED', req.userId, `Created task: ${title} for ${usernames}`, req);
 
         res.json({ success: true, message: 'Task created successfully' });
     } catch (error) {
@@ -882,12 +894,13 @@ app.post('/api/tasks', requireAuth, async (req, res) => {
     }
 });
 
+// In server.js - Update task completion
+
 app.post('/api/tasks/:id/complete', requireAuth, async (req, res) => {
     try {
         const taskId = req.params.id;
         const { remarks, attachments } = req.body;
 
-        // Validate task ID
         if (!taskId || taskId === 'undefined' || !taskId.match(/^[0-9a-fA-F]{24}$/)) {
             return res.status(400).json({ error: 'Invalid task ID' });
         }
@@ -898,10 +911,81 @@ app.post('/api/tasks/:id/complete', requireAuth, async (req, res) => {
             return res.status(404).json({ error: 'Task not found' });
         }
 
-        if (task.assignedTo.toString() !== req.userId) {
+        // Check if user is assigned to this task
+        const isAssigned = task.assignedTo.some(id => id.toString() === req.userId);
+        if (!isAssigned) {
             return res.status(403).json({ error: 'Not authorized to complete this task' });
         }
 
+        // For job-auto tasks (single assignee) - original logic
+        if (task.type === 'job-auto') {
+            task.status = 'pending_approval';
+            task.completedAt = new Date();
+            task.completionRemarks = remarks;
+            if (attachments) task.completionAttachments = attachments;
+
+            await task.save();
+
+            // Create next task in job flow if needed
+            if (task.jobId && task.jobDetails.nextStage && task.jobDetails.nextStage !== 'completed') {
+                const job = await Job.findById(task.jobId);
+                if (job) {
+                    const flowInfo = statusFlow[task.jobDetails.nextStage];
+                    if (flowInfo) {
+                        const departmentUsers = await getUsersByDepartment(flowInfo.stage);
+                        if (departmentUsers.length > 0) {
+                            await createAutoTask(job, task.jobDetails.nextStage, departmentUsers[0]._id);
+                        }
+                    }
+                }
+            }
+
+            await logActivity('TASK_COMPLETED', req.userId, `Completed task: ${task.title}`, req);
+            return res.json({ success: true, message: 'Task submitted for approval' });
+        }
+
+        // For manual tasks with multiple assignees
+        if (task.assignedTo.length > 1) {
+            // Check if user already completed
+            const existingCompletion = task.individualCompletions.find(
+                comp => comp.userId.toString() === req.userId
+            );
+
+            if (existingCompletion) {
+                return res.status(400).json({ error: 'You have already completed this task' });
+            }
+
+            // Add individual completion
+            task.individualCompletions.push({
+                userId: req.userId,
+                completedAt: new Date(),
+                remarks: remarks,
+                attachments: attachments || []
+            });
+
+            // Check if all assignees have completed
+            const allCompleted = task.assignedTo.length === task.individualCompletions.length;
+
+            if (allCompleted) {
+                task.status = 'pending_approval';
+                task.completedAt = new Date();
+                task.completionRemarks = task.individualCompletions
+                    .map(comp => comp.remarks)
+                    .filter(Boolean)
+                    .join('; ');
+            }
+
+            await task.save();
+
+            const message = allCompleted ?
+                'Task submitted for approval (all assignees completed)' :
+                'Your completion recorded. Waiting for other assignees.';
+
+            await logActivity('TASK_COMPLETED', req.userId, `Completed task: ${task.title}`, req);
+            return res.json({ success: true, message });
+        }
+
+        // For single assignee manual tasks
         task.status = 'pending_approval';
         task.completedAt = new Date();
         task.completionRemarks = remarks;
@@ -909,27 +993,162 @@ app.post('/api/tasks/:id/complete', requireAuth, async (req, res) => {
 
         await task.save();
 
-        // If this is a job auto-task, create next task in flow
-        if (task.type === 'job-auto' && task.jobId) {
-            const job = await Job.findById(task.jobId);
-            if (job && task.nextStage && task.nextStage !== 'completed') {
-                const flowInfo = statusFlow[task.nextStage];
-                if (flowInfo) {
-                    const departmentUsers = await getUsersByDepartment(flowInfo.stage);
-                    if (departmentUsers.length > 0) {
-                        await createAutoTask(job, task.nextStage, departmentUsers[0]._id);
-                    }
-                }
-            }
-        }
-
         await logActivity('TASK_COMPLETED', req.userId, `Completed task: ${task.title}`, req);
-        res.json({ success: true, message: 'Task marked for completion' });
+        res.json({ success: true, message: 'Task submitted for approval' });
+
     } catch (error) {
         console.error('Error completing task:', error);
         res.status(500).json({ error: 'Error completing task' });
     }
 });
+
+app.post('/api/tasks/assign-peer', requireAuth, async (req, res) => {
+    try {
+        const { title, description, assignedTo, priority, dueDate } = req.body;
+        const assignerUser = await User.findById(req.userId);
+
+        console.log('Received task assignment request:', { title, assignedTo, priority });
+        console.log('Assigner user:', assignerUser.username, 'Department:', assignerUser.department, 'Role:', assignerUser.role);
+
+        if (!title || !description || !assignedTo || !priority || !dueDate) {
+            return res.status(400).json({ error: 'All fields are required' });
+        }
+
+        // IMPORTANT: Ensure assignedTo is always treated as an array
+        let assigneeIds = Array.isArray(assignedTo) ? assignedTo : [assignedTo];
+
+        console.log('Processing assignee IDs:', assigneeIds);
+
+        // Validate that assignee IDs are valid ObjectIds
+        assigneeIds = assigneeIds.filter(id => id && id.match(/^[0-9a-fA-F]{24}$/));
+
+        if (assigneeIds.length === 0) {
+            return res.status(400).json({ error: 'No valid assignees provided' });
+        }
+
+        // Validate assignees exist and are active
+        const assignees = await User.find({
+            _id: { $in: assigneeIds },
+            isActive: true
+        });
+
+        console.log('Found assignees:', assignees.map(u => ({
+            username: u.username,
+            department: u.department,
+            role: u.role
+        })));
+
+        if (assignees.length !== assigneeIds.length) {
+            return res.status(400).json({ error: 'Some assignees were not found or are inactive' });
+        }
+
+        // REMOVED: Department validation - Allow cross-department task assignment
+        // All users can now assign tasks to colleagues from any department
+        console.log('Cross-department assignment allowed for all users');
+
+        const taskData = {
+            title,
+            description,
+            assignedTo: assigneeIds, // Array of user IDs
+            assignedBy: req.userId,
+            priority,
+            status: 'pending',
+            type: 'user',
+            dueDate: new Date(dueDate),
+            individualCompletions: assigneeIds.length > 1 ? [] : undefined // Only for multi-assignee
+        };
+
+        console.log('Creating task with data:', {
+            ...taskData,
+            assignedTo: taskData.assignedTo.length + ' users'
+        });
+
+        const task = await Task.create(taskData);
+
+        const usernames = assignees.map(u => u.username).join(', ');
+        await logActivity('PEER_TASK_ASSIGNED', req.userId, `Assigned task: ${title} to ${usernames}`, req);
+
+        console.log('Task created successfully:', task._id);
+
+        res.json({
+            success: true,
+            message: `Task assigned successfully to ${assignees.length} colleague(s): ${usernames}`,
+            taskId: task._id
+        });
+    } catch (error) {
+        console.error('Error assigning task:', error);
+        res.status(500).json({ error: 'Error assigning task: ' + error.message });
+    }
+});
+
+// ALSO FIX: Colleagues endpoint to handle department issues better
+app.get('/api/users/colleagues', requireAuth, async (req, res) => {
+    try {
+        const currentUser = await User.findById(req.userId);
+
+        if (!currentUser) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        console.log('Current user:', currentUser.username, 'Department:', currentUser.department, 'Role:', currentUser.role);
+
+        // Build query to get colleagues from ALL departments
+        let query = {
+            isActive: true,
+            role: 'user',
+            _id: { $ne: req.userId } // Exclude current user
+        };
+
+        // REMOVED: Department filtering - Show all colleagues regardless of department
+        console.log('Showing all colleagues from all departments');
+
+        console.log('Query for colleagues:', JSON.stringify(query));
+
+        const colleagues = await User.find(query)
+            .select('username email department role')
+            .sort({ department: 1, username: 1 });
+
+        console.log('Found colleagues:', colleagues.length);
+
+        res.json(colleagues);
+    } catch (error) {
+        console.error('Error fetching colleagues:', error);
+        res.status(500).json({ error: 'Error fetching colleagues: ' + error.message });
+    }
+});
+
+// DEBUGGING: Add endpoint to check user departments
+app.get('/api/debug/users', requireAuth, async (req, res) => {
+    try {
+        const currentUser = await User.findById(req.userId);
+        const allUsers = await User.find({ isActive: true })
+            .select('username department role')
+            .sort({ department: 1, username: 1 });
+
+        res.json({
+            currentUser: {
+                username: currentUser.username,
+                department: currentUser.department,
+                role: currentUser.role
+            },
+            allUsers: allUsers.map(u => ({
+                id: u._id,
+                username: u.username,
+                department: u.department,
+                role: u.role
+            })),
+            departmentCounts: allUsers.reduce((acc, user) => {
+                const dept = user.department || 'No Department';
+                acc[dept] = (acc[dept] || 0) + 1;
+                return acc;
+            }, {})
+        });
+    } catch (error) {
+        console.error('Error in debug endpoint:', error);
+        res.status(500).json({ error: 'Debug error: ' + error.message });
+    }
+});
+
 app.post('/api/tasks/:id/approve', requireAuth, async (req, res) => {
     try {
         const taskId = req.params.id;

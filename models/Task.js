@@ -1,5 +1,4 @@
 const mongoose = require('mongoose');
-
 const taskSchema = new mongoose.Schema({
     title: {
         type: String,
@@ -10,12 +9,12 @@ const taskSchema = new mongoose.Schema({
         type: String,
         required: true
     },
-
-    assignedTo: {
+    // CHANGE: Support both single and multiple assignees
+    assignedTo: [{
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
         required: true
-    },
+    }],
     assignedBy: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
@@ -41,14 +40,17 @@ const taskSchema = new mongoose.Schema({
         ref: 'Job',
         default: null
     },
-    docNo: String,
-    customerName: String,
-    itemCode: String,
-    qty: Number,
-    currentStage: String,
-    nextStage: String,
-
-    jobDescription: String,
+    // ADD: Job details for easier access (for job-auto tasks only)
+    jobDetails: {
+        docNo: String,
+        customerName: String,
+        itemCode: String,
+        description: String, // Job description - THIS IS THE MAIN ADDITION
+        qty: Number,
+        currentStage: String,
+        nextStage: String
+    },
+    // EXISTING fields...
     dueDate: {
         type: Date,
         required: true
@@ -69,7 +71,17 @@ const taskSchema = new mongoose.Schema({
     statusChangeReason: String,
     statusChangedAt: Date,
     completionAttachments: [String],
-    attachments: [String]
+    attachments: [String],
+    // ADD: Individual completion tracking (only used for manual multi-assignee tasks)
+    individualCompletions: [{
+        userId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User'
+        },
+        completedAt: Date,
+        remarks: String,
+        attachments: [String]
+    }]
 }, {
     timestamps: true
 });
