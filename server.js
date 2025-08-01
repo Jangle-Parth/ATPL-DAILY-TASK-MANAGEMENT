@@ -746,9 +746,24 @@ app.post('/api/tasks/:id/reject', requireAuth, async (req, res) => {
 
         const user = await User.findById(req.userId);
 
-        // Check rejection permissions
-        if (task.type === 'super-admin' && user.role !== 'super-admin') {
-            return res.status(403).json({ error: 'Only super-admin can reject super-admin tasks' });
+        let canReject = false;
+
+        if (task.type === 'super-admin' && user.role === 'super-admin') {
+            canReject = true;
+        } else if (task.type === 'job-auto' && (user.role === 'admin' || user.role === 'super-admin')) {
+            canReject = true;
+        } else if (task.assignedBy && task.assignedBy.toString() === req.userId) {
+            // User can reject tasks they assigned
+            canReject = true;
+        } else if ((user.role === 'admin' || user.role === 'super-admin') && !task.assignedBy) {
+            // Admin can reject system-generated tasks
+            canReject = true;
+        }
+
+        if (!canReject) {
+            return res.status(403).json({
+                error: 'Not authorized to reject this task. Only the task assigner or admin can reject.'
+            });
         }
 
         if (task.status !== 'pending_approval') {
@@ -1165,11 +1180,31 @@ app.post('/api/tasks/:id/approve', requireAuth, async (req, res) => {
         }
 
         const user = await User.findById(req.userId);
+        let canApprove = false;
 
         // Check approval permissions
         if (task.type === 'super-admin' && user.role !== 'super-admin') {
             return res.status(403).json({ error: 'Only super-admin can approve super-admin tasks' });
+        } else if (task.type === 'job-auto' && (user.role === 'admin' || user.role === 'super-admin')) {
+            canApprove = true;
+        } else if (task.assignedBy && task.assignedBy.toString() === req.userId) {
+            // User can approve tasks they assigned
+            canApprove = true;
+        } else if ((user.role === 'admin' || user.role === 'super-admin') && !task.assignedBy) {
+            // Admin can approve system-generated tasks
+            canApprove = true;
         }
+
+        if (!canApprove) {
+            return res.status(403).json({
+                error: 'Not authorized to approve this task. Only the task assigner or admin can approve.'
+            });
+        }
+
+        if (task.status !== 'pending_approval') {
+            return res.status(400).json({ error: 'Only pending approval tasks can be approved' });
+        }
+
 
         if (task.assignedBy && task.assignedBy.toString() !== req.userId && user.role !== 'admin' && user.role !== 'super-admin') {
             return res.status(403).json({ error: 'Not authorized to approve this task' });

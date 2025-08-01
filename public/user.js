@@ -213,12 +213,22 @@ document.addEventListener('DOMContentLoaded', function () {
         const container = document.getElementById('allTasksContainer');
         container.innerHTML = '';
 
-        if (tasks.length === 0) {
-            container.innerHTML = '<p style="text-align: center; color: #64748b; padding: 40px;">No tasks assigned</p>';
+        // Filter out tasks assigned BY current user - only show tasks assigned TO current user
+        const tasksAssignedToMe = tasks.filter(task => {
+            // Check if current user is in assignedTo array (for multiple assignees)
+            if (Array.isArray(task.assignedTo)) {
+                return task.assignedTo.some(assignee => assignee._id === currentUser.id);
+            }
+            // Check if current user is the single assignee
+            return task.assignedTo._id === currentUser.id || task.assignedTo === currentUser.id;
+        });
+
+        if (tasksAssignedToMe.length === 0) {
+            container.innerHTML = '<p style="text-align: center; color: #64748b; padding: 40px;">No tasks assigned to you</p>';
             return;
         }
 
-        tasks.forEach(task => {
+        tasksAssignedToMe.forEach(task => {
             container.appendChild(createTaskCard(task));
         });
     }
@@ -228,15 +238,21 @@ document.addEventListener('DOMContentLoaded', function () {
         container.innerHTML = '';
 
         const filteredTasks = tasks.filter(task => {
+            // First, exclude tasks assigned BY current user (they should only appear in "My Assigned Tasks")
+            if (task.assignedBy && (task.assignedBy._id === currentUser.id || task.assignedBy === currentUser.id)) {
+                return false; // Don't show tasks I assigned in other sections
+            }
+
+            // Then filter by type for tasks assigned TO current user
             if (type === 'job-entry') return task.type === 'job-auto';
             if (type === 'super-admin') return task.type === 'super-admin';
             if (type === 'admin') return task.type === 'admin';
-            if (type === 'user-assigned') return task.type === 'user';
+            if (type === 'user-assigned') return task.type === 'user' || task.type === 'manual';
             return false;
         });
 
         if (filteredTasks.length === 0) {
-            container.innerHTML = `<p style = "text-align: center; color: #64748b; padding: 40px;"> No ${type} tasks</p> `;
+            container.innerHTML = `<p style="text-align: center; color: #64748b; padding: 40px;">No ${type.replace('-', ' ')} tasks assigned to you</p>`;
             return;
         }
 
@@ -682,6 +698,9 @@ document.addEventListener('DOMContentLoaded', function () {
             case 'user-assigned':
                 renderTasksByType('user-assigned', 'userAssignedTasksContainer');
                 break;
+            case 'my-assigned-tasks': // NEW
+                renderMyAssignedTasks();
+                break;
             case 'due-dates':
                 loadDashboardStats();
                 break;
@@ -690,6 +709,174 @@ document.addEventListener('DOMContentLoaded', function () {
                 break;
         }
     }
+
+    // NEW: Function to render tasks assigned by current user
+    function renderMyAssignedTasks() {
+        const container = document.getElementById('myAssignedTasksContainer');
+        container.innerHTML = '';
+
+        // Filter tasks assigned by current user
+        const myAssignedTasks = tasks.filter(task =>
+            task.assignedBy && task.assignedBy._id === currentUser.id
+        );
+
+        if (myAssignedTasks.length === 0) {
+            container.innerHTML = '<p style="text-align: center; color: #64748b; padding: 40px;">You haven\'t assigned any tasks to others</p>';
+            return;
+        }
+
+        // Group tasks by status for better organization
+        const groupedTasks = {
+            pending: myAssignedTasks.filter(t => t.status === 'pending'),
+            pending_approval: myAssignedTasks.filter(t => t.status === 'pending_approval'),
+            completed: myAssignedTasks.filter(t => t.status === 'completed'),
+            rejected: myAssignedTasks.filter(t => t.status === 'rejected')
+        };
+
+        // Create status sections
+        Object.entries(groupedTasks).forEach(([status, statusTasks]) => {
+            if (statusTasks.length > 0) {
+                const statusHeader = document.createElement('h4');
+                statusHeader.textContent = `${status.replace('_', ' ').toUpperCase()} (${statusTasks.length})`;
+                statusHeader.style.cssText = `
+                margin: 20px 0 15px 0;
+                color: #1e293b;
+                border-bottom: 2px solid #e5e7eb;
+                padding-bottom: 8px;
+            `;
+                container.appendChild(statusHeader);
+
+                statusTasks.forEach(task => {
+                    container.appendChild(createMyAssignedTaskCard(task));
+                });
+            }
+        });
+    }
+
+    // NEW: Create task card specifically for tasks assigned by current user
+    function createMyAssignedTaskCard(task) {
+        const card = document.createElement('div');
+        card.className = `task-card priority-${task.priority}`;
+
+        const dueDate = new Date(task.dueDate);
+        const today = new Date();
+        const isOverdue = task.status === 'pending' && dueDate < today;
+
+        // Handle assignee display (works for both single and multiple)
+        const assigneeNames = Array.isArray(task.assignedTo) ?
+            task.assignedTo.map(user => user.username || 'Unknown').join(', ') :
+            (task.assignedTo?.username || 'Unknown');
+
+        // Show completion status for multi-assignee tasks
+        const multiAssigneeStatus = Array.isArray(task.assignedTo) && task.assignedTo.length > 1 ? `
+        <div style="background: #f8fafc; padding: 6px 8px; border-radius: 4px; margin: 6px 0; font-size: 0.75rem; color: #64748b;">
+            👥 Multi-assignee task: ${task.individualCompletions?.length || 0}/${task.assignedTo.length} completed
+        </div>
+    ` : '';
+
+        // Show completion/rejection details
+        const statusDetails = (() => {
+            if (task.status === 'completed' && task.completedAt) {
+                return `<div style="background: #f0fdf4; padding: 8px; border-radius: 4px; margin: 8px 0; font-size: 0.8rem; color: #065f46;">
+                ✅ Completed: ${new Date(task.completedAt).toLocaleDateString()}
+                ${task.completionRemarks ? `<br>Remarks: ${task.completionRemarks}` : ''}
+            </div>`;
+            } else if (task.status === 'rejected' && task.rejectionReason) {
+                return `<div style="background: #fef2f2; padding: 8px; border-radius: 4px; margin: 8px 0; font-size: 0.8rem; color: #991b1b;">
+                ❌ Rejected: ${task.rejectionReason}
+            </div>`;
+            } else if (task.status === 'pending_approval') {
+                return `<div style="background: #eff6ff; padding: 8px; border-radius: 4px; margin: 8px 0; font-size: 0.8rem; color: #1e40af;">
+                ⏳ Waiting for your approval
+            </div>`;
+            }
+            return '';
+        })();
+
+        card.innerHTML = `
+        <div class="task-header">
+            <div>
+                <div class="task-title">${task.title}</div>
+                <div class="task-meta">
+                    Assigned to: ${assigneeNames} | Priority: ${task.priority.toUpperCase()}
+                </div>
+            </div>
+            <span class="task-status ${isOverdue ? 'status-overdue' : 'status-' + task.status}">
+                ${isOverdue ? 'Overdue' : task.status.replace('_', ' ').toUpperCase()}
+            </span>
+        </div>
+        
+        <div class="task-description">${task.description}</div>
+        
+        ${multiAssigneeStatus}
+        ${statusDetails}
+        
+        <div class="task-footer">
+            <small>Due: ${dueDate.toLocaleDateString()}</small>
+            <div class="task-actions">
+                ${task.status === 'pending_approval' ? `
+                    <button class="btn-small btn-success" onclick="approveMyTask('${task._id}')">Approve</button>
+                    <button class="btn-small btn-danger" onclick="rejectMyTask('${task._id}')">Reject</button>
+                ` : ''}
+                <button class="btn-small btn-primary" onclick="viewTaskDetails('${task._id}')">Details</button>
+            </div>
+        </div>
+    `;
+
+        return card;
+    }
+
+    // NEW: Approve task assigned by current user
+    window.approveMyTask = async function (taskId) {
+        if (!confirm('Are you sure you want to approve this task?')) return;
+
+        try {
+            const response = await fetch(`${API_URL}/tasks/${taskId}/approve`, {
+                method: 'POST',
+                headers: getAuthHeaders()
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                showMessage('Task approved successfully', 'success');
+                await loadTasks(); // Reload tasks
+                renderMyAssignedTasks(); // Refresh the view
+            } else {
+                showMessage(result.error, 'error');
+            }
+        } catch (error) {
+            console.error('Error approving task:', error);
+            showMessage('Error approving task', 'error');
+        }
+    };
+
+    // NEW: Reject task assigned by current user
+    window.rejectMyTask = async function (taskId) {
+        const reason = prompt('Please provide a reason for rejection:');
+        if (!reason) return;
+
+        try {
+            const response = await fetch(`${API_URL}/tasks/${taskId}/reject`, {
+                method: 'POST',
+                headers: getAuthHeaders(),
+                body: JSON.stringify({ reason })
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                showMessage('Task rejected successfully', 'success');
+                await loadTasks(); // Reload tasks
+                renderMyAssignedTasks(); // Refresh the view
+            } else {
+                showMessage(result.error, 'error');
+            }
+        } catch (error) {
+            console.error('Error rejecting task:', error);
+            showMessage('Error rejecting task', 'error');
+        }
+    };
 
     function renderUserAnalytics() {
         const completedTasks = tasks.filter(t => t.status === 'completed').length;
