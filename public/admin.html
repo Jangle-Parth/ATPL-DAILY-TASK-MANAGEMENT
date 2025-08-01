@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ATPL Admin Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="admin-container">
+        <header class="header">
+            <div class="logo">
+                <h2>ATPL Admin</h2>
+            </div>
+            <nav class="nav">
+                <button class="nav-btn active" data-section="dashboard">Dashboard</button>
+                <button class="nav-btn" data-section="users">Users</button>
+                <button class="nav-btn" data-section="jobs">Jobs</button>
+                <button class="nav-btn" data-section="tasks">Tasks</button>
+                <button class="nav-btn" data-section="analytics">Analytics</button>
+            </nav>
+            <div class="user-info">
+                <span id="userInfo"></span>
+                <button id="logoutBtn" class="logout-btn">Logout</button>
+            </div>
+        </header>
+
+        <main class="main-content">
+            <!-- Dashboard Section -->
+            <section id="dashboard" class="section active">
+                <h3>Dashboard Overview</h3>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <h4>Total Users</h4>
+                        <span id="totalUsers" class="stat-number">0</span>
+                    </div>
+                    <div class="stat-card">
+                        <h4>Total Jobs</h4>
+                        <span id="totalJobs" class="stat-number">0</span>
+                    </div>
+                    <div class="stat-card">
+                        <h4>Active Tasks</h4>
+                        <span id="activeTasks" class="stat-number">0</span>
+                    </div>
+                    <div class="stat-card">
+                        <h4>Pending Approvals</h4>
+                        <span id="pendingApprovals" class="stat-number">0</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Users Section -->
+            <section id="users" class="section">
+                <div class="section-header">
+                    <h3>User Management</h3>
+                    <button id="addUserBtn" class="btn btn-primary">Add User</button>
+                </div>
+                
+                <div class="search-bar">
+                    <input type="text" id="userSearch" placeholder="Search users...">
+                </div>
+
+                <div class="table-container">
+                    <table id="usersTable" class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Username</th>
+                                <th>Email</th>
+                                <th>Department</th>
+                                <th>Role</th>
+                                <th>Created</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Jobs Section -->
+            <section id="jobs" class="section">
+                <div class="section-header">
+                    <h3>Job Management</h3>
+                    <div class="btn-group">
+                        <button id="addJobBtn" class="btn btn-primary">Add Job</button>
+                        <button id="uploadJobsBtn" class="btn btn-secondary">Upload Excel</button>
+                    </div>
+                </div>
+                
+                <div class="search-bar">
+                    <input type="text" id="jobSearch" placeholder="Search jobs...">
+                </div>
+
+                <div class="table-container">
+                    <table id="jobsTable" class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Doc No</th>
+                                <th>Customer</th>
+                                <th>Item Code</th>
+                                <th>Description</th>
+                                <th>Qty</th>
+                                <th>Month</th>
+                                <th>Week</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Tasks Section -->
+            <section id="tasks" class="section">
+                <div class="section-header">
+                    <h3>Task Management</h3>
+                    <button id="addTaskBtn" class="btn btn-primary">Create Task</button>
+                </div>
+                
+                <div class="search-bar">
+                    <input type="text" id="taskSearch" placeholder="Search tasks...">
+                </div>
+
+                <div id="tasksContainer" class="tasks-container"></div>
+            </section>
+
+            <!-- Analytics Section -->
+            <section id="analytics" class="section">
+                <div class="section-header">
+                    <h3>Analytics & Reports</h3>
+                    <button id="generateReportBtn" class="btn btn-primary">Generate Report</button>
+                </div>
+                
+                <div class="analytics-grid">
+                    <div class="analytics-card">
+                        <h4>User Performance</h4>
+                        <div id="userPerformanceChart" class="chart-container"></div>
+                    </div>
+                    <div class="analytics-card">
+                        <h4>Task Distribution</h4>
+                        <div id="taskDistributionChart" class="chart-container"></div>
+                    </div>
+                    <div class="analytics-card">
+                        <h4>Department Workload</h4>
+                        <div id="departmentWorkloadChart" class="chart-container"></div>
+                    </div>
+                    <div class="analytics-card">
+                        <h4>Job Status Flow</h4>
+                        <div id="jobStatusChart" class="chart-container"></div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Modals -->
+    <!-- Add User Modal -->
+    <div id="addUserModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Add New User</h3>
+                <span class="close">&times;</span>
+            </div>
+            <form id="addUserForm" class="modal-form">
+                <div class="form-group">
+                    <label for="newUsername">Username</label>
+                    <input type="text" id="newUsername" name="username" required>
+                </div>
+                <div class="form-group">
+                    <label for="newEmail">Email</label>
+                    <input type="email" id="newEmail" name="email" required>
+                </div>
+                <div class="form-group">
+                    <label for="newPassword">Password</label>
+                    <input type="password" id="newPassword" name="password" required>
+                </div>
+                <div class="form-group">
+                    <label for="newDepartment">Department</label>
+                    <select id="newDepartment" name="department" required>
+                        <option value="">Select Department</option>
+                        <option value="sales">Sales</option>
+                        <option value="design">Design</option>
+                        <option value="planning">Planning</option>
+                        <option value="purchase">Purchase</option>
+                        <option value="production">Production</option>
+                        <option value="quality">Quality</option>
+                    </select>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('addUserModal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create User</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Job Modal -->
+    <div id="addJobModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Add New Job</h3>
+                <span class="close">&times;</span>
+            </div>
+            <form id="addJobForm" class="modal-form">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="jobMonth">Month</label>
+                        <input type="text" id="jobMonth" name="month" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="jobDocNo">Doc No</label>
+                        <input type="text" id="jobDocNo" name="docNo" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="jobCustomer">Customer Name</label>
+                    <input type="text" id="jobCustomer" name="customerName" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="jobItemCode">Item Code</label>
+                        <input type="text" id="jobItemCode" name="itemCode" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="jobQty">Quantity</label>
+                        <input type="number" id="jobQty" name="qty" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="jobDescription">Description</label>
+                    <textarea id="jobDescription" name="description" required></textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="jobWeek">Week</label>
+                        <input type="text" id="jobWeek" name="week" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="jobStatus">Status</label>
+                        <select id="jobStatus" name="status" required>
+                            <option value="">Select Status</option>
+                            <option value="Sales Order received">Sales Order received</option>
+                            <option value="Drawing Approved">Drawing Approved</option>
+                            <option value="Long lead item detail given">Long lead item detail given</option>
+                            <option value="Drawing/BOM Issued">Drawing/BOM Issued</option>
+                            <option value="Production order and Purchase request prepared">Production order and Purchase request prepared</option>
+                            <option value="RM Received">RM Received</option>
+                            <option value="Production Started">Production Started</option>
+                            <option value="Production completed">Production completed</option>
+                            <option value="QC clear for Dispatch">QC clear for Dispatch</option>
+                            <option value="Dispatch clearance">Dispatch clearance</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('addJobModal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create Job</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Upload Jobs Modal -->
+    <div id="uploadJobsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Upload Jobs via Excel</h3>
+                <span class="close">&times;</span>
+            </div>
+            <form id="uploadJobsForm" class="modal-form">
+                <div class="form-group">
+                    <label for="excelFile">Excel File</label>
+                    <input type="file" id="excelFile" name="excel" accept=".xlsx,.xls" required>
+                    <small>Excel should contain columns: month, docNo, customerName, itemCode, description, qty, week, status</small>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('uploadJobsModal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Upload</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Task Modal -->
+    <div id="addTaskModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Create New Task</h3>
+                <span class="close">&times;</span>
+            </div>
+            <form id="addTaskForm" class="modal-form">
+                <div class="form-group">
+                    <label for="taskTitle">Task Title</label>
+                    <input type="text" id="taskTitle" name="title" required>
+                </div>
+                <div class="form-group">
+                    <label for="taskDescription">Description</label>
+                    <textarea id="taskDescription" name="description" required></textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="taskAssignTo">Assign To</label>
+                        <select id="taskAssignTo" name="assignedTo" required>
+                            <option value="">Select User</option>
+                            <option value="self">Self</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="taskPriority">Priority</label>
+                        <select id="taskPriority" name="priority" required>
+                            <option value="">Select Priority</option>
+                            <option value="low">Low</option>
+                            <option value="medium">Medium</option>
+                            <option value="high">High</option>
+                            <option value="urgent">Urgent</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="taskDueDate">Due Date</label>
+                    <input type="date" id="taskDueDate" name="dueDate" required>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('addTaskModal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create Task</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="admin.js"></script>
+</body>
+</html>

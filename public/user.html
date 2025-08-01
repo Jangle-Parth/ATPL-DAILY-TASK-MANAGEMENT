@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ATPL User Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="user-container">
+        <header class="header">
+            <div class="logo">
+                <h2>ATPL Tasks</h2>
+            </div>
+            <nav class="nav">
+                <button class="nav-btn active" data-section="all-tasks">All Tasks</button>
+                <button class="nav-btn" data-section="job-entry">Job Entry</button>
+                <button class="nav-btn" data-section="super-admin">Super Admin</button>
+                <button class="nav-btn" data-section="admin">Admin</button>
+                <button class="nav-btn" data-section="user-assigned">User Assigned</button>
+                <button class="nav-btn" data-section="due-dates">Due Dates</button>
+                <button class="nav-btn" data-section="analytics">Analytics</button>
+            </nav>
+            <div class="user-info">
+                <span id="userInfo"></span>
+                <button id="logoutBtn" class="logout-btn">Logout</button>
+            </div>
+        </header>
+
+        <main class="main-content">
+            <!-- All Tasks Section -->
+            <section id="all-tasks" class="section active">
+                <div class="section-header">
+                    <h3>All Tasks</h3>
+                    <div class="universal-search">
+                        <input type="text" id="universalSearch" placeholder="Search anything...">
+                        <button id="searchBtn" class="btn btn-primary">Search</button>
+                    </div>
+                </div>
+                <div id="allTasksContainer" class="tasks-container"></div>
+            </section>
+
+            <!-- Job Entry Tasks Section -->
+            <section id="job-entry" class="section">
+                <h3>Job Entry Tasks</h3>
+                <div id="jobEntryTasksContainer" class="tasks-container"></div>
+            </section>
+
+            <!-- Super Admin Tasks Section -->
+            <section id="super-admin" class="section">
+                <h3>Super Admin Tasks</h3>
+                <div id="superAdminTasksContainer" class="tasks-container"></div>
+            </section>
+
+            <!-- Admin Tasks Section -->
+            <section id="admin" class="section">
+                <h3>Admin Tasks</h3>
+                <div id="adminTasksContainer" class="tasks-container"></div>
+            </section>
+
+            <!-- User Assigned Tasks Section -->
+            <section id="user-assigned" class="section">
+                <h3>User Assigned Tasks</h3>
+                <div id="userAssignedTasksContainer" class="tasks-container"></div>
+            </section>
+
+            <!-- Due Dates Section -->
+            <section id="due-dates" class="section">
+                <h3>Due Dates Dashboard</h3>
+                <div class="due-dates-grid">
+                    <div class="due-card">
+                        <h4>Due Today</h4>
+                        <span id="dueToday" class="due-count">0</span>
+                        <div id="dueTodayTasks" class="due-tasks"></div>
+                    </div>
+                    <div class="due-card">
+                        <h4>Due Tomorrow</h4>
+                        <span id="dueTomorrow" class="due-count">0</span>
+                        <div id="dueTomorrowTasks" class="due-tasks"></div>
+                    </div>
+                    <div class="due-card">
+                        <h4>Due This Week</h4>
+                        <span id="dueThisWeek" class="due-count">0</span>
+                        <div id="dueThisWeekTasks" class="due-tasks"></div>
+                    </div>
+                    <div class="due-card">
+                        <h4>Due This Month</h4>
+                        <span id="dueThisMonth" class="due-count">0</span>
+                        <div id="dueThisMonthTasks" class="due-tasks"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Analytics Section -->
+            <section id="analytics" class="section">
+                <h3>My Analytics</h3>
+                <div class="user-analytics-grid">
+                    <div class="analytics-card">
+                        <h4>Task Completion Rate</h4>
+                        <div id="userCompletionChart" class="chart-container"></div>
+                    </div>
+                    <div class="analytics-card">
+                        <h4>Priority Distribution</h4>
+                        <div id="userPriorityChart" class="chart-container"></div>
+                    </div>
+                    <div class="analytics-card">
+                        <h4>Monthly Performance</h4>
+                        <div id="userMonthlyChart" class="chart-container"></div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Task Completion Modal -->
+    <div id="completeTaskModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Complete Task</h3>
+                <span class="close">&times;</span>
+            </div>
+            <form id="completeTaskForm" class="modal-form">
+                <input type="hidden" id="completeTaskId">
+                <div class="form-group">
+                    <label for="completionRemarks">Remarks</label>
+                    <textarea id="completionRemarks" name="remarks" placeholder="Add any remarks about task completion..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="completionAttachment">Attach Document</label>
+                    <input type="file" id="completionAttachment" name="attachment">
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('completeTaskModal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Complete Task</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="user.js"></script>
+</body>
+</html>
