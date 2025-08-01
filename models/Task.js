@@ -10,6 +10,7 @@ const taskSchema = new mongoose.Schema({
         type: String,
         required: true
     },
+
     assignedTo: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
@@ -46,6 +47,8 @@ const taskSchema = new mongoose.Schema({
     qty: Number,
     currentStage: String,
     nextStage: String,
+
+    jobDescription: String,
     dueDate: {
         type: Date,
         required: true

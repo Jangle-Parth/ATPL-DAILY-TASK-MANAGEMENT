@@ -154,6 +154,7 @@ async function createAutoTask(job, status, assignedToId) {
             customerName: job.customerName,
             itemCode: job.itemCode,
             qty: job.qty,
+            jobDescription: job.description,
             currentStage: flowInfo.stage,
             nextStage: flowInfo.next,
             dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days from now
@@ -854,6 +855,8 @@ app.post('/api/tasks', requireAuth, async (req, res) => {
         if (!title || !description || !assignedTo || !priority || !dueDate) {
             return res.status(400).json({ error: 'All fields are required' });
         }
+
+
 
         const taskData = {
             title,
