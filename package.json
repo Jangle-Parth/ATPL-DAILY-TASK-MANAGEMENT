@@ -26,7 +26,8 @@
     "task-management",
     "mongodb",
     "express",
-    "nodejs"
+    "nodejs",
+    "jsonwebtoken"
   ],
   "author": "ATPL",
   "license": "MIT"
