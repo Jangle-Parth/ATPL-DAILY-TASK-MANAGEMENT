@@ -2,7 +2,8 @@
 document.addEventListener('DOMContentLoaded', function () {
     const loginForm = document.getElementById('loginForm');
     const errorMessage = document.getElementById('errorMessage');
-    const API_URL = 'http://localhost:3000/api';
+    const API_URL = 'https://atpl-daily-task-management.onrender.com/api';
+    // const API_URL = 'http://localhost:3000/api';
 
     // Check if already logged in
     checkExistingAuth();
