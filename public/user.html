@@ -4,148 +4,1729 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ATPL User Dashboard</title>
-    <link rel="stylesheet" href="styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        
+        :root {
+            --primary: #4F46E5;
+            --primary-dark: #3730A3;
+            --secondary: #10B981;
+            --accent: #8B5CF6;
+            --danger: #EF4444;
+            --warning: #F59E0B;
+            --info: #3B82F6;
+            --gray-50: #F9FAFB;
+            --gray-100: #F3F4F6;
+            --gray-200: #E5E7EB;
+            --gray-300: #D1D5DB;
+            --gray-500: #6B7280;
+            --gray-600: #4B5563;
+            --gray-700: #374151;
+            --gray-800: #1F2937;
+            --gray-900: #111827;
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+            --border-radius: 12px;
+            --border-radius-lg: 16px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+           
+           
+            color: var(--gray-900);
+        }
+        .universal-search {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 2rem;
+    align-items: stretch;
+}
+
+.universal-search input {
+    flex: 1;
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--gray-300);
+    border-radius: var(--border-radius);
+    font-size: 0.9rem;
+    transition: all 0.2s ease;
+}
+
+.universal-search input:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+}
+
+@media (max-width: 600px) {
+    .universal-search {
+        flex-direction: column;
+    }
+}
+
+        .user-container {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        /* Enhanced Header */
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            padding: 1.5rem 2rem;
+            border-bottom: 1px solid var(--gray-200);
+            box-shadow: var(--shadow-sm);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    max-width: 1400px;
+    margin: 0 auto;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+@media (max-width: 1200px) {
+    .header-content {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .nav-tabs {
+        order: 2;
+        justify-content: flex-start;
+        overflow-x: auto;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+    }
+    
+    .nav-tabs::-webkit-scrollbar {
+        display: none;
+    }
+    
+    .user-info {
+        order: 1;
+        align-self: flex-end;
+    }
+}
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .logo h1 {
+            font-size: 2rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .logo-icon {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+            border-radius: var(--border-radius);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.5rem;
+        }
+
+        .nav-tabs {
+            display: flex;
+            gap: 0.5rem;
+            background: var(--gray-100);
+            padding: 0.5rem;
+            border-radius: var(--border-radius);
+        }
+
+        .nav-tab {
+    padding: 0.75rem 1rem; /* Reduced from 1.5rem */
+    border: none;
+    background: transparent;
+    color: var(--gray-600);
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 500;
+    font-size: 0.85rem; /* Slightly smaller font */
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    min-width: fit-content;
+}
+
+        .nav-tab:hover {
+            background: white;
+            color: var(--primary);
+            transform: translateY(-1px);
+        }
+
+        .nav-tab.active {
+            background: white;
+            color: var(--primary);
+            box-shadow: var(--shadow-sm);
+            font-weight: 600;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+        }
+
+        .user-details {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .user-name {
+            font-weight: 600;
+            color: var(--gray-900);
+        }
+
+        .user-role {
+            font-size: 0.8rem;
+            color: var(--gray-600);
+        }
+
+        .logout-btn {
+            padding: 0.5rem 1rem;
+            background: var(--danger);
+            color: white;
+            border: none;
+            border-radius: var(--border-radius);
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .logout-btn:hover {
+            background: #DC2626;
+            transform: translateY(-1px);
+        }
+
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            background: var(--gray-50);
+            padding: 2rem;
+        }
+
+        .content-wrapper {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .section {
+            display: none;
+        }
+
+        .section.active {
+            display: block;
+            animation: fadeIn 0.4s ease;
+        }
+        .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.section-header h3 {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--gray-900);
+    margin: 0;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+@media (max-width: 768px) {
+    .section-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .action-buttons {
+        justify-content: stretch;
+    }
+    
+    .action-buttons .btn {
+        flex: 1;
+        justify-content: center;
+    }
+}
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .dashboard-grid {
+    display: grid;
+    grid-template-columns: 1fr 320px; /* Slightly smaller sidebar */
+    gap: 1.5rem; /* Reduced gap */
+    margin-bottom: 2rem;
+}
+
+@media (max-width: 1024px) {
+    .dashboard-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+}
+
+        .main-dashboard {
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+        }
+
+        .quick-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: var(--border-radius-lg);
+            box-shadow: var(--shadow-md);
+            border: 1px solid var(--gray-200);
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-xl);
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+        }
+
+        .stat-card.pending::before { background: var(--warning); }
+        .stat-card.completed::before { background: var(--secondary); }
+        .stat-card.overdue::before { background: var(--danger); }
+        .stat-card.total::before { background: var(--primary); }
+
+        .stat-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .stat-title {
+            color: var(--gray-600);
+            font-size: 0.9rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .stat-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            color: white;
+        }
+
+        .stat-icon.pending { background: var(--warning); }
+        .stat-icon.completed { background: var(--secondary); }
+        .stat-icon.overdue { background: var(--danger); }
+        .stat-icon.total { background: var(--primary); }
+
+        .stat-number {
+            font-size: 2rem;
+            font-weight: 800;
+            color: var(--gray-900);
+            line-height: 1;
+        }
+
+        .stat-change {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .stat-change.positive { color: var(--secondary); }
+        .stat-change.negative { color: var(--danger); }
+
+        /* Sidebar Widget */
+        .sidebar-widget {
+            background: white;
+            border-radius: var(--border-radius-lg);
+            box-shadow: var(--shadow-md);
+            border: 1px solid var(--gray-200);
+            overflow: hidden;
+        }
+
+        .widget-header {
+            padding: 1.5rem;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+            color: white;
+        }
+
+        .widget-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .widget-content {
+            padding: 1.5rem;
+        }
+
+        .due-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 0;
+            border-bottom: 1px solid var(--gray-100);
+        }
+
+        .due-item:last-child { border-bottom: none; }
+
+        .due-task {
+            flex: 1;
+        }
+
+        .due-task-title {
+            font-weight: 600;
+            color: var(--gray-900);
+            margin-bottom: 0.25rem;
+        }
+
+        .due-task-meta {
+            font-size: 0.8rem;
+            color: var(--gray-600);
+        }
+
+        .due-badge {
+            padding: 0.375rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .due-today { background: #FEE2E2; color: #991B1B; }
+        .due-tomorrow { background: #FEF3C7; color: #92400E; }
+        .due-week { background: #EFF6FF; color: #1E40AF; }
+
+        /* Enhanced Task Cards */
+        .tasks-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .search-filters {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .search-container {
+            position: relative;
+            min-width: 300px;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 0.75rem 1rem 0.75rem 3rem;
+            border: 1px solid var(--gray-300);
+            border-radius: var(--border-radius);
+            font-size: 0.9rem;
+            transition: all 0.2s ease;
+            background: white;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--gray-500);
+        }
+
+        .filter-dropdown {
+            position: relative;
+        }
+
+        .filter-btn {
+            padding: 0.75rem 1rem;
+            background: white;
+            border: 1px solid var(--gray-300);
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-weight: 500;
+            color: var(--gray-700);
+            transition: all 0.2s ease;
+        }
+
+        .filter-btn:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: var(--border-radius);
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            text-decoration: none;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+            color: white;
+        }
+
+        .btn-secondary {
+            background: white;
+            color: var(--gray-700);
+            border: 1px solid var(--gray-300);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .tasks-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); /* Smaller min-width */
+    gap: 1.25rem; /* Reduced gap */
+    max-width: 100%;
+}
+
+        .task-card {
+            background: white;
+            border-radius: var(--border-radius-lg);
+            padding: 1.5rem;
+            box-shadow: var(--shadow-md);
+            border: 1px solid var(--gray-200);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .task-card:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-xl);
+        }
+
+        .task-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+            transition: width 0.3s ease;
+        }
+
+        .task-card.priority-low::before { background: var(--secondary); }
+        .task-card.priority-medium::before { background: var(--warning); }
+        .task-card.priority-high::before { background: var(--danger); }
+        .task-card.priority-urgent::before { background: #DC2626; animation: urgentPulse 2s infinite; }
+
+        .task-card:hover::before { width: 8px; }
+
+        @keyframes urgentPulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .task-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 1rem;
+            gap: 1rem;
+        }
+
+        .task-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--gray-900);
+            line-height: 1.4;
+        }
+
+        .task-status {
+            padding: 0.375rem 0.875rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+        }
+
+        .status-pending {
+            background: linear-gradient(135deg, #FEF3C7, #FDE68A);
+            color: #92400E;
+        }
+
+        .status-pending_approval {
+            background: linear-gradient(135deg, #DBEAFE, #BFDBFE);
+            color: #1E40AF;
+        }
+
+        .status-completed {
+            background: linear-gradient(135deg, #D1FAE5, #A7F3D0);
+            color: #065F46;
+        }
+
+        .status-overdue {
+            background: linear-gradient(135deg, #FEE2E2, #FECACA);
+            color: #991B1B;
+        }
+
+        .task-meta {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            font-size: 0.85rem;
+            color: var(--gray-600);
+            flex-wrap: wrap;
+        }
+
+        .task-meta span {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .priority-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.25rem 0.75rem;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .priority-low { background: #D1FAE5; color: #065F46; }
+        .priority-medium { background: #FEF3C7; color: #92400E; }
+        .priority-high { background: #FEE2E2; color: #991B1B; }
+        .priority-urgent { background: #DC2626; color: white; }
+
+        .task-description {
+            color: var(--gray-700);
+            line-height: 1.6;
+            margin-bottom: 1.5rem;
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .task-job-info {
+            background: var(--gray-50);
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            border-left: 4px solid var(--info);
+        }
+
+        .job-header {
+            font-weight: 600;
+            color: var(--info);
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .job-details {
+            font-size: 0.85rem;
+            color: var(--gray-600);
+            line-height: 1.4;
+        }
+
+        .task-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 1rem;
+            border-top: 1px solid var(--gray-200);
+        }
+
+        .task-due {
+            font-size: 0.85rem;
+            color: var(--gray-600);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .overdue {
+            color: var(--danger);
+            font-weight: 600;
+        }
+
+        .task-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .task-action-btn {
+            width: 36px;
+            height: 36px;
+            border: none;
+            border-radius: 8px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .task-action-btn.complete { background: var(--secondary); }
+        .task-action-btn.view { background: var(--info); }
+        .task-action-btn.edit { background: var(--accent); }
+
+        .task-action-btn:hover {
+            transform: scale(1.1);
+            box-shadow: var(--shadow-md);
+        }
+
+        .analytics-overview {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); /* Smaller min-width */
+    gap: 1.5rem; /* Reduced gap */
+    margin-bottom: 2rem; /* Reduced margin */
+}
+        .analytics-card {
+            background: white;
+            border-radius: var(--border-radius-lg);
+            padding: 2rem;
+            box-shadow: var(--shadow-md);
+            border: 1px solid var(--gray-200);
+        }
+
+        .analytics-card h3 {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--gray-900);
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .chart-container {
+            height: 250px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--gray-50);
+            border-radius: var(--border-radius);
+            position: relative;
+        }
+
+        .progress-ring {
+            width: 120px;
+            height: 120px;
+            position: relative;
+        }
+
+        .progress-ring svg {
+            width: 100%;
+            height: 100%;
+            transform: rotate(-90deg);
+        }
+
+        .progress-ring circle {
+            fill: none;
+            stroke-width: 8;
+        }
+
+        .progress-ring .bg {
+            stroke: var(--gray-200);
+        }
+
+        .progress-ring .progress {
+            stroke: var(--primary);
+            stroke-linecap: round;
+            transition: stroke-dasharray 0.3s ease;
+        }
+
+        .progress-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+        }
+
+        .progress-percentage {
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: var(--primary);
+        }
+
+        .progress-label {
+            font-size: 0.8rem;
+            color: var(--gray-600);
+        }
+
+        .performance-metrics {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .metric-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 0;
+            border-bottom: 1px solid var(--gray-100);
+        }
+
+        .metric-item:last-child { border-bottom: none; }
+
+        .metric-label {
+            font-weight: 500;
+            color: var(--gray-700);
+        }
+
+        .metric-value {
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .trend-chart {
+            height: 200px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+            border-radius: var(--border-radius);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .trend-line {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 60%;
+            background: rgba(255, 255, 255, 0.2);
+            clip-path: polygon(0 100%, 0 70%, 20% 60%, 40% 80%, 60% 40%, 80% 50%, 100% 20%, 100% 100%);
+        }
+
+        .trend-stats {
+            position: absolute;
+            top: 1rem;
+            left: 1rem;
+            color: white;
+        }
+
+        .trend-value {
+            font-size: 2rem;
+            font-weight: 800;
+            margin-bottom: 0.25rem;
+        }
+
+        .trend-label {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+
+        /* Modals */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(5px);
+            z-index: 1000;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .modal-content {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: white;
+    padding: 1.5rem; /* Reduced padding */
+    border-radius: var(--border-radius-lg);
+    box-shadow: var(--shadow-xl);
+    max-width: 500px; /* Smaller max-width */
+    width: 95%; /* Increased width percentage */
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+@media (max-width: 600px) {
+    .modal-content {
+        width: 98%;
+        max-width: none;
+        padding: 1rem;
+        margin: 1rem;
+    }
+}
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--gray-200);
+        }
+
+        .modal-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--gray-900);
+        }
+
+        .close-btn {
+            width: 32px;
+            height: 32px;
+            border: none;
+            background: var(--gray-100);
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--gray-600);
+            transition: all 0.2s ease;
+        }
+
+        .close-btn:hover {
+            background: var(--danger);
+            color: white;
+            transform: rotate(90deg);
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: var(--gray-700);
+        }
+
+        .form-input, .form-textarea, .form-select {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid var(--gray-300);
+            border-radius: var(--border-radius);
+            font-size: 0.9rem;
+            transition: all 0.2s ease;
+        }
+
+        .form-input:focus, .form-textarea:focus, .form-select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+        }
+
+        .form-textarea {
+            min-height: 120px;
+            resize: vertical;
+        }
+
+        .form-actions {
+            display: flex;
+            gap: 1rem;
+            justify-content: flex-end;
+            margin-top: 2rem;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 1024px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .nav-tabs {
+                overflow-x: auto;
+                scrollbar-width: none;
+                -ms-overflow-style: none;
+            }
+            
+            .nav-tabs::-webkit-scrollbar {
+                display: none;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .header {
+                padding: 1rem;
+            }
+
+            .header-content {
+                flex-direction: column;
+                gap: 1rem;
+                align-items: stretch;
+            }
+
+            .nav-tabs {
+                justify-content: flex-start;
+            }
+
+            .main-content {
+                padding: 1rem;
+            }
+
+            .quick-stats {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .tasks-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .analytics-overview {
+                grid-template-columns: 1fr;
+            }
+
+            .search-filters {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .search-container {
+                min-width: auto;
+            }
+        }
+
+        /* Loading States */
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid var(--gray-200);
+            border-radius: 50%;
+            border-top-color: var(--primary);
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .skeleton {
+            background: linear-gradient(90deg, var(--gray-200) 25%, var(--gray-300) 50%, var(--gray-200) 75%);
+            background-size: 200% 100%;
+            animation: loading 1.5s ease-in-out infinite;
+            border-radius: var(--border-radius);
+        }
+
+        @keyframes loading {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 4rem 2rem;
+            background: white;
+            border-radius: var(--border-radius-lg);
+            border: 2px dashed var(--gray-300);
+        }
+
+        .empty-state-icon {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 1.5rem;
+            background: var(--gray-100);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            color: var(--gray-400);
+        }
+
+        .empty-state h3 {
+            font-size: 1.5rem;
+            color: var(--gray-700);
+            margin-bottom: 1rem;
+            font-weight: 600;
+        }
+
+        .empty-state p {
+            color: var(--gray-500);
+            margin-bottom: 2rem;
+            font-size: 1.1rem;
+        }
+    </style>
 </head>
 <body>
     <div class="user-container">
+        <!-- Enhanced Header -->
         <header class="header">
-            <div class="logo">
-                <h2>ATPL Tasks</h2>
-            </div>
-            <nav class="nav">
-                <button class="nav-btn active" data-section="all-tasks">All Tasks</button>
-                <button class="nav-btn" data-section="job-entry">Job Entry</button>
-                <button class="nav-btn" data-section="super-admin">Super Admin</button>
-                <button class="nav-btn" data-section="admin">Admin</button>
-                <button class="nav-btn" data-section="user-assigned">User Assigned</button>
-                <button class="nav-btn" data-section="my-assigned-tasks">My Assigned Tasks</button> <!-- NEW -->
-                <button class="nav-btn" data-section="due-dates">Due Dates</button>
-                <button class="nav-btn" data-section="analytics">Analytics</button>
-                <button id="assignPeerTaskBtn" class="btn btn-secondary" style="margin-left: 20px;">Assign Task to Collegue</button>
-            </nav>
-            <div class="user-info">
-                <span id="userInfo"></span>
-                <button id="logoutBtn" class="logout-btn">Logout</button>
+            <div class="header-content">
+                <div class="logo">
+                    <div class="logo-icon">
+                        <i class="fas fa-tasks"></i>
+                    </div>
+                    <h1>ATPL Tasks</h1>
+                </div>
+                
+                <nav class="nav-tabs">
+                    <button class="nav-tab active" data-section="dashboard">
+                        <i class="fas fa-chart-line"></i>
+                        Dashboard
+                    </button>
+                    <button class="nav-tab" data-section="all-tasks">
+                        <i class="fas fa-tasks"></i>
+                        My Tasks
+                    </button>
+                    <button class="nav-tab" data-section="job-entry">
+                        <i class="fas fa-briefcase"></i>
+                        Job Entry
+                    </button>
+                    <button class="nav-tab" data-section="super-admin">
+                        <i class="fas fa-crown"></i>
+                        Super Admin
+                    </button>
+                    <button class="nav-tab" data-section="admin">
+                        <i class="fas fa-user-shield"></i>
+                        Admin Tasks
+                    </button>
+                    <button class="nav-tab" data-section="user-assigned">
+                        <i class="fas fa-user-friends"></i>
+                        User Assigned
+                    </button>
+                    <button class="nav-tab" data-section="my-assigned-tasks">
+                        <i class="fas fa-clipboard-user"></i>
+                        My Assigned Tasks
+                    </button>
+                    <button class="nav-tab" data-section="due-dates">
+                        <i class="fas fa-calendar-alt"></i>
+                        Due Dates
+                    </button>
+                    <button class="nav-tab" data-section="analytics">
+                        <i class="fas fa-chart-pie"></i>
+                        Analytics
+                    </button>
+                </nav>
+
+                <div class="user-info">
+                    <div class="user-avatar" id="userAvatar">U</div>
+                    <div class="user-details">
+                        <div class="user-name" id="userName">Loading...</div>
+                        <div class="user-role" id="userRole">Loading...</div>
+                    </div>
+                    <button class="logout-btn" id="logoutBtn">
+                        <i class="fas fa-sign-out-alt"></i>
+                        Logout
+                    </button>
+                </div>
             </div>
         </header>
 
+        <!-- Main Content -->
         <main class="main-content">
-            <!-- All Tasks Section -->
-            <section id="all-tasks" class="section active">
-                <div class="section-header">
-                    <h3>All Tasks</h3>
+            <div class="content-wrapper">
+                <!-- Dashboard Section -->
+                <section id="dashboard" class="section active">
+                    <div class="dashboard-grid">
+                        <div class="main-dashboard">
+                            <div class="quick-stats">
+                                <div class="stat-card total">
+                                    <div class="stat-header">
+                                        <div>
+                                            <div class="stat-title">Total Tasks</div>
+                                            <div class="stat-number" id="totalTasks">0</div>
+                                            <div class="stat-change positive">
+                                                <i class="fas fa-arrow-up"></i>
+                                                Loading...
+                                            </div>
+                                        </div>
+                                        <div class="stat-icon total">
+                                            <i class="fas fa-tasks"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="stat-card pending">
+                                    <div class="stat-header">
+                                        <div>
+                                            <div class="stat-title">Pending</div>
+                                            <div class="stat-number" id="pendingTasks">0</div>
+                                            <div class="stat-change negative">
+                                                <i class="fas fa-arrow-down"></i>
+                                                Loading...
+                                            </div>
+                                        </div>
+                                        <div class="stat-icon pending">
+                                            <i class="fas fa-clock"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="stat-card completed">
+                                    <div class="stat-header">
+                                        <div>
+                                            <div class="stat-title">Completed</div>
+                                            <div class="stat-number" id="completedTasks">0</div>
+                                            <div class="stat-change positive">
+                                                <i class="fas fa-arrow-up"></i>
+                                                Loading...
+                                            </div>
+                                        </div>
+                                        <div class="stat-icon completed">
+                                            <i class="fas fa-check-circle"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="stat-card overdue">
+                                    <div class="stat-header">
+                                        <div>
+                                            <div class="stat-title">Overdue</div>
+                                            <div class="stat-number" id="overdueTasks">0</div>
+                                            <div class="stat-change negative">
+                                                <i class="fas fa-exclamation-triangle"></i>
+                                                Loading...
+                                            </div>
+                                        </div>
+                                        <div class="stat-icon overdue">
+                                            <i class="fas fa-exclamation-triangle"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Sidebar Widget -->
+                        <div class="sidebar-widget">
+                            <div class="widget-header">
+                                <div class="widget-title">
+                                    <i class="fas fa-calendar-check"></i>
+                                    Upcoming Due Dates
+                                </div>
+                            </div>
+                            <div class="widget-content">
+                                <div id="dueTodayTasks">
+                                    <div style="text-align: center; color: #64748b; padding: 20px;">
+                                        Loading upcoming tasks...
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- All Tasks Section -->
+                <section id="all-tasks" class="section">
+                    <div class="section-header">
+                        <h3>My Tasks</h3>
+                        <div class="action-buttons">
+                            <button class="btn btn-primary" id="assignPeerTaskBtn">
+                                <i class="fas fa-user-plus"></i>
+                                Assign Task to Colleague
+                            </button>
+                        </div>
+                    </div>
+
                     <div class="universal-search">
-                        <input type="text" id="universalSearch" placeholder="Search anything...">
-                        <button id="searchBtn" class="btn btn-primary">Search</button>
+                        <input type="text" id="universalSearch" placeholder="Search tasks, jobs, users..." />
+                        <button class="btn btn-primary" id="searchBtn">
+                            <i class="fas fa-search"></i>
+                            Search
+                        </button>
                     </div>
-                </div>
-                <div id="allTasksContainer" class="tasks-container"></div>
-            </section>
 
-            <!-- Job Entry Tasks Section -->
-            <section id="job-entry" class="section">
-                <h3>Job Entry Tasks</h3>
-                <div id="jobEntryTasksContainer" class="tasks-container"></div>
-            </section>
+                    <div id="allTasksContainer">
+                        <div style="text-align: center; padding: 40px; color: #64748b;">
+                            <div class="loading"></div>
+                            <p>Loading your tasks...</p>
+                        </div>
+                    </div>
+                </section>
 
-            <!-- Super Admin Tasks Section -->
-            <section id="super-admin" class="section">
-                <h3>Super Admin Tasks</h3>
-                <div id="superAdminTasksContainer" class="tasks-container"></div>
-            </section>
+                <!-- Job Entry Section -->
+                <section id="job-entry" class="section">
+                    <div class="section-header">
+                        <h3>Job Entry Tasks</h3>
+                    </div>
 
-            <!-- Admin Tasks Section -->
-            <section id="admin" class="section">
-                <h3>Admin Tasks</h3>
-                <div id="adminTasksContainer" class="tasks-container"></div>
-            </section>
+                    <div id="jobEntryTasksContainer">
+                        <div style="text-align: center; padding: 40px; color: #64748b;">
+                            <div class="loading"></div>
+                            <p>Loading job entry tasks...</p>
+                        </div>
+                    </div>
+                </section>
 
-            <!-- User Assigned Tasks Section -->
-            <section id="user-assigned" class="section">
-                <h3>User Assigned Tasks</h3>
-                <div id="userAssignedTasksContainer" class="tasks-container"></div>
-            </section>
+                <!-- Super Admin Tasks Section -->
+                <section id="super-admin" class="section">
+                    <div class="section-header">
+                        <h3>Super Admin Tasks</h3>
+                    </div>
 
-            <!-- My Assigned Tasks Section - NEW -->
-            <section id="my-assigned-tasks" class="section">
-                <h3>Tasks I Assigned to Others</h3>
-                <div id="myAssignedTasksContainer" class="tasks-container"></div>
-            </section>
+                    <div id="superAdminTasksContainer">
+                        <div style="text-align: center; padding: 40px; color: #64748b;">
+                            <div class="loading"></div>
+                            <p>Loading super admin tasks...</p>
+                        </div>
+                    </div>
+                </section>
 
-            <!-- Due Dates Section -->
-            <section id="due-dates" class="section">
-                <h3>Due Dates Dashboard</h3>
-                <div class="due-dates-grid">
-                    <div class="due-card">
-                        <h4>Due Today</h4>
-                        <span id="dueToday" class="due-count">0</span>
-                        <div id="dueTodayTasks" class="due-tasks"></div>
+                <!-- Admin Tasks Section -->
+                <section id="admin" class="section">
+                    <div class="section-header">
+                        <h3>Admin Tasks</h3>
                     </div>
-                    <div class="due-card">
-                        <h4>Due Tomorrow</h4>
-                        <span id="dueTomorrow" class="due-count">0</span>
-                        <div id="dueTomorrowTasks" class="due-tasks"></div>
-                    </div>
-                    <div class="due-card">
-                        <h4>Due This Week</h4>
-                        <span id="dueThisWeek" class="due-count">0</span>
-                        <div id="dueThisWeekTasks" class="due-tasks"></div>
-                    </div>
-                    <div class="due-card">
-                        <h4>Due This Month</h4>
-                        <span id="dueThisMonth" class="due-count">0</span>
-                        <div id="dueThisMonthTasks" class="due-tasks"></div>
-                    </div>
-                </div>
-            </section>
 
-            <!-- Analytics Section -->
-            <section id="analytics" class="section">
-                <h3>My Analytics</h3>
-                <div class="user-analytics-grid">
-                    <div class="analytics-card">
-                        <h4>Task Completion Rate</h4>
-                        <div id="userCompletionChart" class="chart-container"></div>
+                    <div id="adminTasksContainer">
+                        <div style="text-align: center; padding: 40px; color: #64748b;">
+                            <div class="loading"></div>
+                            <p>Loading admin tasks...</p>
+                        </div>
                     </div>
-                    <div class="analytics-card">
-                        <h4>Priority Distribution</h4>
-                        <div id="userPriorityChart" class="chart-container"></div>
+                </section>
+
+                <!-- User Assigned Tasks Section -->
+                <section id="user-assigned" class="section">
+                    <div class="section-header">
+                        <h3>User Assigned Tasks</h3>
                     </div>
-                    <div class="analytics-card">
-                        <h4>Monthly Performance</h4>
-                        <div id="userMonthlyChart" class="chart-container"></div>
+
+                    <div id="userAssignedTasksContainer">
+                        <div style="text-align: center; padding: 40px; color: #64748b;">
+                            <div class="loading"></div>
+                            <p>Loading user assigned tasks...</p>
+                        </div>
                     </div>
-                </div>
-            </section>
+                </section>
+
+                <!-- My Assigned Tasks Section -->
+                <section id="my-assigned-tasks" class="section">
+                    <div class="section-header">
+                        <h3>Tasks I Assigned to Others</h3>
+                        <div class="action-buttons">
+                            <button class="btn btn-primary" onclick="openModal('assignPeerTaskModal')">
+                                <i class="fas fa-user-plus"></i>
+                                Assign New Task
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="myAssignedTasksContainer">
+                        <div style="text-align: center; padding: 40px; color: #64748b;">
+                            <div class="loading"></div>
+                            <p>Loading tasks you assigned...</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Due Dates Section -->
+                <section id="due-dates" class="section">
+                    <div class="section-header">
+                        <h3>Due Dates Dashboard</h3>
+                    </div>
+
+                    <div class="analytics-overview">
+                        <div class="analytics-card">
+                            <h3>
+                                <i class="fas fa-calendar-day"></i>
+                                Due Today
+                            </h3>
+                            <div class="chart-container">
+                                <div class="metric-row">
+                                    <span class="metric-label">Tasks Due Today</span>
+                                    <span class="metric-value" id="dueToday">0</span>
+                                </div>
+                                <div id="dueTodayTasks" style="margin-top: 1rem; max-height: 200px; overflow-y: auto;">
+                                    <!-- Dynamic content -->
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="analytics-card">
+                            <h3>
+                                <i class="fas fa-calendar-plus"></i>
+                                Due Tomorrow
+                            </h3>
+                            <div class="chart-container">
+                                <div class="metric-row">
+                                    <span class="metric-label">Tasks Due Tomorrow</span>
+                                    <span class="metric-value" id="dueTomorrow">0</span>
+                                </div>
+                                <div id="dueTomorrowTasks" style="margin-top: 1rem; max-height: 200px; overflow-y: auto;">
+                                    <!-- Dynamic content -->
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="analytics-card">
+                            <h3>
+                                <i class="fas fa-calendar-week"></i>
+                                Due This Week
+                            </h3>
+                            <div class="chart-container">
+                                <div class="metric-row">
+                                    <span class="metric-label">Tasks Due This Week</span>
+                                    <span class="metric-value" id="dueThisWeek">0</span>
+                                </div>
+                                <div id="dueThisWeekTasks" style="margin-top: 1rem; max-height: 200px; overflow-y: auto;">
+                                    <!-- Dynamic content -->
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="analytics-card">
+                            <h3>
+                                <i class="fas fa-calendar-alt"></i>
+                                Due This Month
+                            </h3>
+                            <div class="chart-container">
+                                <div class="metric-row">
+                                    <span class="metric-label">Tasks Due This Month</span>
+                                    <span class="metric-value" id="dueThisMonth">0</span>
+                                </div>
+                                <div id="dueThisMonthTasks" style="margin-top: 1rem; max-height: 200px; overflow-y: auto;">
+                                    <!-- Dynamic content -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Enhanced Analytics Section -->
+                <section id="analytics" class="section">
+                    <div class="section-header">
+                        <h3>My Analytics</h3>
+                        <div class="action-buttons">
+                            <button class="btn btn-secondary">
+                                <i class="fas fa-download"></i>
+                                Export Report
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="analytics-overview">
+                        <div class="analytics-card">
+                            <h3>
+                                <i class="fas fa-chart-pie"></i>
+                                Task Completion Rate
+                            </h3>
+                            <div class="chart-container">
+                                <div class="progress-ring">
+                                    <svg>
+                                        <circle class="bg" cx="60" cy="60" r="50"></circle>
+                                        <circle class="progress" cx="60" cy="60" r="50" 
+                                                stroke-dasharray="314" stroke-dashoffset="62.8"></circle>
+                                    </svg>
+                                    <div class="progress-text">
+                                        <div class="progress-percentage">80%</div>
+                                        <div class="progress-label">Completed</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="analytics-card">
+                            <h3>
+                                <i class="fas fa-chart-line"></i>
+                                Performance Trend
+                            </h3>
+                            <div class="chart-container">
+                                <div class="trend-chart">
+                                    <div class="trend-line"></div>
+                                    <div class="trend-stats">
+                                        <div class="trend-value">+15%</div>
+                                        <div class="trend-label">Performance Improvement</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="analytics-card">
+                            <h3>
+                                <i class="fas fa-clock"></i>
+                                Time Management
+                            </h3>
+                            <div class="chart-container">
+                                <div class="performance-metrics">
+                                    <div class="metric-item">
+                                        <span class="metric-label">Average Completion Time</span>
+                                        <span class="metric-value">2.3 days</span>
+                                    </div>
+                                    <div class="metric-item">
+                                        <span class="metric-label">On-Time Delivery</span>
+                                        <span class="metric-value">92%</span>
+                                    </div>
+                                    <div class="metric-item">
+                                        <span class="metric-label">Fastest Completion</span>
+                                        <span class="metric-value">4 hours</span>
+                                    </div>
+                                    <div class="metric-item">
+                                        <span class="metric-label">Late Submissions</span>
+                                        <span class="metric-value">2 tasks</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="analytics-card">
+                            <h3>
+                                <i class="fas fa-tasks"></i>
+                                Task Breakdown
+                            </h3>
+                            <div class="chart-container">
+                                <div class="performance-metrics">
+                                    <div class="metric-item">
+                                        <span class="metric-label">Job-Auto Tasks</span>
+                                        <span class="metric-value">12 (50%)</span>
+                                    </div>
+                                    <div class="metric-item">
+                                        <span class="metric-label">Manual Tasks</span>
+                                        <span class="metric-value">8 (33%)</span>
+                                    </div>
+                                    <div class="metric-item">
+                                        <span class="metric-label">Admin Tasks</span>
+                                        <span class="metric-value">3 (13%)</span>
+                                    </div>
+                                    <div class="metric-item">
+                                        <span class="metric-label">User Tasks</span>
+                                        <span class="metric-value">1 (4%)</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="analytics-card">
+                            <h3>
+                                <i class="fas fa-star"></i>
+                                Priority Distribution
+                            </h3>
+                            <div class="chart-container">
+                                <div style="display: flex; flex-direction: column; gap: 1rem;">
+                                    <div>
+                                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                                            <span>Low Priority</span>
+                                            <span>35%</span>
+                                        </div>
+                                        <div style="background: var(--gray-200); height: 8px; border-radius: 4px;">
+                                            <div style="background: var(--secondary); height: 100%; width: 35%; border-radius: 4px;"></div>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                                            <span>Medium Priority</span>
+                                            <span>40%</span>
+                                        </div>
+                                        <div style="background: var(--gray-200); height: 8px; border-radius: 4px;">
+                                            <div style="background: var(--warning); height: 100%; width: 40%; border-radius: 4px;"></div>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                                            <span>High Priority</span>
+                                            <span>20%</span>
+                                        </div>
+                                        <div style="background: var(--gray-200); height: 8px; border-radius: 4px;">
+                                            <div style="background: var(--danger); height: 100%; width: 20%; border-radius: 4px;"></div>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                                            <span>Urgent</span>
+                                            <span>5%</span>
+                                        </div>
+                                        <div style="background: var(--gray-200); height: 8px; border-radius: 4px;">
+                                            <div style="background: #DC2626; height: 100%; width: 5%; border-radius: 4px;"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="analytics-card">
+                            <h3>
+                                <i class="fas fa-calendar"></i>
+                                Monthly Summary
+                            </h3>
+                            <div class="chart-container">
+                                <div class="performance-metrics">
+                                    <div class="metric-item">
+                                        <span class="metric-label">Tasks Completed</span>
+                                        <span class="metric-value">
+                                            18
+                                            <span style="color: var(--secondary); font-size: 0.8rem;">
+                                                <i class="fas fa-arrow-up"></i> +25%
+                                            </span>
+                                        </span>
+                                    </div>
+                                    <div class="metric-item">
+                                        <span class="metric-label">Average Rating</span>
+                                        <span class="metric-value">4.8/5.0 ⭐</span>
+                                    </div>
+                                    <div class="metric-item">
+                                        <span class="metric-label">Efficiency Score</span>
+                                        <span class="metric-value">92%</span>
+                                    </div>
+                                    <div class="metric-item">
+                                        <span class="metric-label">Team Rank</span>
+                                        <span class="metric-value">#3 of 24</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
         </main>
     </div>
 
-    <div id="assignPeerTaskModal" class="modal">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h3>Assign Task to Colleague</h3>
-            <span class="close">&times;</span>
-        </div>
-        <form id="assignPeerTaskForm" class="modal-form">
-            <div class="form-group">
-                <label for="peerTaskTitle">Task Title</label>
-                <input type="text" id="peerTaskTitle" name="title" required>
+    <!-- Task Completion Modal -->
+    <div id="completeTaskModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Complete Task</h3>
+                <button class="close-btn">
+                    <i class="fas fa-times"></i>
+                </button>
             </div>
-            <div class="form-group">
-                <label for="peerTaskDescription">Description</label>
-                <textarea id="peerTaskDescription" name="description" required></textarea>
-            </div>
-            <div class="form-group">
-                <label for="peerTaskAssignTo">Assign To (Hold Ctrl/Cmd to select multiple)</label>
-                <select id="peerTaskAssignTo" name="assignedTo" multiple required>
-                    <!-- Options will be populated by JavaScript -->
-                </select>
-                <small>Hold Ctrl/Cmd to select multiple colleagues</small>
-            </div>
-            <div class="form-row">
+            <form id="completeTaskForm">
+                <input type="hidden" id="completeTaskId" />
                 <div class="form-group">
-                    <label for="peerTaskPriority">Priority</label>
-                    <select id="peerTaskPriority" name="priority" required>
+                    <label class="form-label">Completion Remarks</label>
+                    <textarea name="remarks" class="form-textarea" placeholder="Add any comments about task completion..." required></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Attachment (Optional)</label>
+                    <input type="file" name="attachment" class="form-input" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png">
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('completeTaskModal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Submit for Approval</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Assign Task to Peer Modal -->
+    <div id="assignPeerTaskModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Assign Task to Colleague</h3>
+                <button class="close-btn">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form id="assignPeerTaskForm">
+                <div class="form-group">
+                    <label class="form-label">Task Title</label>
+                    <input type="text" name="title" class="form-input" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Description</label>
+                    <textarea name="description" class="form-textarea" required></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Assign To</label>
+                    <select id="peerTaskAssignTo" name="assignedTo" class="form-input" multiple required>
+                        <option value="">Loading colleagues...</option>
+                    </select>
+                    <small style="color: var(--gray-600); margin-top: 0.5rem; display: block;">
+                        Hold Ctrl/Cmd to select multiple colleagues
+                    </small>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Priority</label>
+                    <select name="priority" class="form-input" required>
                         <option value="">Select Priority</option>
                         <option value="low">Low</option>
                         <option value="medium">Medium</option>
@@ -154,38 +1735,12 @@
                     </select>
                 </div>
                 <div class="form-group">
-                    <label for="peerTaskDueDate">Due Date</label>
-                    <input type="date" id="peerTaskDueDate" name="dueDate" required>
-                </div>
-            </div>
-            <div class="form-actions">
-                <button type="button" class="btn btn-secondary" onclick="closeModal('assignPeerTaskModal')">Cancel</button>
-                <button type="submit" class="btn btn-primary">Assign Task</button>
-            </div>
-        </form>
-    </div>
-</div>
-
-    <!-- Task Completion Modal -->
-    <div id="completeTaskModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Complete Task</h3>
-                <span class="close">&times;</span>
-            </div>
-            <form id="completeTaskForm" class="modal-form">
-                <input type="hidden" id="completeTaskId">
-                <div class="form-group">
-                    <label for="completionRemarks">Remarks</label>
-                    <textarea id="completionRemarks" name="remarks" placeholder="Add any remarks about task completion..."></textarea>
-                </div>
-                <div class="form-group">
-                    <label for="completionAttachment">Attach Document</label>
-                    <input type="file" id="completionAttachment" name="attachment">
+                    <label class="form-label">Due Date</label>
+                    <input type="date" name="dueDate" class="form-input" required>
                 </div>
                 <div class="form-actions">
-                    <button type="button" class="btn btn-secondary" onclick="closeModal('completeTaskModal')">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Complete Task</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('assignPeerTaskModal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Assign Task</button>
                 </div>
             </form>
         </div>

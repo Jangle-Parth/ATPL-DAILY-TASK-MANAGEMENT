@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', function () {
     // Navigation
     const navButtons = document.querySelectorAll('.nav-btn');
     const sections = document.querySelectorAll('.section');
+    const pageTitle = document.getElementById('pageTitle');
 
     navButtons.forEach(btn => {
         btn.addEventListener('click', function () {
@@ -21,22 +22,57 @@ document.addEventListener('DOMContentLoaded', function () {
             sections.forEach(s => s.classList.remove('active'));
 
             this.classList.add('active');
-            document.getElementById(targetSection).classList.add('active');
+            const targetSectionElement = document.getElementById(targetSection);
+            if (targetSectionElement) {
+                targetSectionElement.classList.add('active');
+            }
+            const titles = {
+                dashboard: 'Dashboard Overview',
+                tasks: 'Task Management',
+                analytics: 'Analytics & Reports',
+                users: 'User Management',
+                jobs: 'Job Management'
+            };
+            if (pageTitle) {
+                pageTitle.textContent = titles[targetSection] || 'Dashboard';
+            }
 
-            // Load section data
-            loadSectionData(targetSection);
+            // Load section data using existing function
+            if (typeof loadSectionData === 'function') {
+                loadSectionData(targetSection);
+            }
         });
     });
 
-    // Modal functionality
-    const modals = document.querySelectorAll('.modal');
-    const closeButtons = document.querySelectorAll('.close');
-
-    closeButtons.forEach(btn => {
+    document.querySelectorAll('.close').forEach(btn => {
         btn.addEventListener('click', function () {
             this.closest('.modal').style.display = 'none';
         });
     });
+
+    // Modal background click handler
+    document.querySelectorAll('.modal').forEach(modal => {
+        modal.addEventListener('click', function (e) {
+            if (e.target === this) {
+                this.style.display = 'none';
+            }
+        });
+    });
+
+    window.openModal = function (modalId) {
+        const modal = document.getElementById(modalId);
+        if (modal) {
+            modal.style.display = 'block';
+        }
+    };
+
+    window.closeModal = function (modalId) {
+        const modal = document.getElementById(modalId);
+        if (modal) {
+            modal.style.display = 'none';
+        }
+    };
+
 
     // Event listeners
     document.getElementById('logoutBtn').addEventListener('click', logout);

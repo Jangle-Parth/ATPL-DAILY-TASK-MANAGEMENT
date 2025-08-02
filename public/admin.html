@@ -4,182 +4,1188 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ATPL Admin Dashboard</title>
-    <link rel="stylesheet" href="styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #4F46E5;
+            --primary-dark: #3730A3;
+            --secondary: #10B981;
+            --accent: #8B5CF6;
+            --danger: #EF4444;
+            --warning: #F59E0B;
+            --gray-50: #F9FAFB;
+            --gray-100: #F3F4F6;
+            --gray-200: #E5E7EB;
+            --gray-300: #D1D5DB;
+            --gray-500: #6B7280;
+            --gray-600: #4B5563;
+            --gray-700: #374151;
+            --gray-800: #1F2937;
+            --gray-900: #111827;
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+            --border-radius: 12px;
+            --border-radius-lg: 16px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: var(--gray-900);
+        }
+
+        .admin-container {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 280px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-right: 1px solid var(--gray-200);
+            padding: 2rem 0;
+            position: fixed;
+            height: 100vh;
+            overflow-y: auto;
+            transition: all 0.3s ease;
+            z-index: 100;
+        }
+
+        .logo {
+            padding: 0 2rem 2rem;
+            border-bottom: 1px solid var(--gray-200);
+            margin-bottom: 2rem;
+        }
+
+        .logo h1 {
+            font-size: 2rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .logo p {
+            color: var(--gray-600);
+            font-size: 0.9rem;
+            margin-top: 0.5rem;
+        }
+
+        .nav-menu {
+            padding: 0 1rem;
+        }
+
+        .nav-item {
+            margin-bottom: 0.5rem;
+        }
+
+        .nav-btn {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1rem 1.5rem;
+            background: transparent;
+            border: none;
+            border-radius: var(--border-radius);
+            color: var(--gray-700);
+            font-weight: 500;
+            text-align: left;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+
+        .nav-btn:hover {
+            background: var(--gray-100);
+            color: var(--primary);
+            transform: translateX(4px);
+        }
+
+        .nav-btn.active {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+            color: white;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .nav-btn i {
+            width: 20px;
+            text-align: center;
+        }
+
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            margin-left: 280px;
+            background: var(--gray-50);
+            min-height: 100vh;
+        }
+
+        .header {
+            background: white;
+            padding: 1.5rem 2rem;
+            border-bottom: 1px solid var(--gray-200);
+            box-shadow: var(--shadow-sm);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 90;
+        }
+
+        .header-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--gray-900);
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+        }
+
+        .logout-btn {
+            padding: 0.5rem 1rem;
+            background: var(--danger);
+            color: white;
+            border: none;
+            border-radius: var(--border-radius);
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .logout-btn:hover {
+            background: #DC2626;
+            transform: translateY(-1px);
+        }
+
+        /* Content Area */
+        .content {
+            padding: 2rem;
+        }
+
+        .section {
+            display: none;
+        }
+
+        .section.active {
+            display: block;
+            animation: fadeIn 0.4s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Dashboard Stats */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 2rem;
+            border-radius: var(--border-radius-lg);
+            box-shadow: var(--shadow-md);
+            border: 1px solid var(--gray-200);
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-xl);
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--primary), var(--accent));
+        }
+
+        .stat-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .stat-title {
+            color: var(--gray-600);
+            font-size: 0.9rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .stat-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: var(--border-radius);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            color: white;
+        }
+
+        .stat-icon.users { background: linear-gradient(135deg, var(--primary) 0%, #6366F1 100%); }
+        .stat-icon.jobs { background: linear-gradient(135deg, var(--secondary) 0%, #34D399 100%); }
+        .stat-icon.tasks { background: linear-gradient(135deg, var(--warning) 0%, #FBBF24 100%); }
+        .stat-icon.approvals { background: linear-gradient(135deg, var(--accent) 0%, #A855F7 100%); }
+
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            line-height: 1;
+        }
+
+        .stat-change {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+
+        .stat-change.positive { color: var(--secondary); }
+        .stat-change.negative { color: var(--danger); }
+
+        /* Enhanced Tasks Section */
+        .tasks-header {
+            display: flex;
+            justify-content: between;
+            align-items: center;
+            margin-bottom: 2rem;
+            gap: 2rem;
+            flex-wrap: wrap;
+        }
+
+        .tasks-filters {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .filter-group {
+            display: flex;
+            background: white;
+            border-radius: var(--border-radius);
+            overflow: hidden;
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--gray-200);
+        }
+
+        .filter-btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            background: white;
+            color: var(--gray-600);
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border-right: 1px solid var(--gray-200);
+        }
+
+        .filter-btn:last-child { border-right: none; }
+
+        .filter-btn:hover {
+            background: var(--gray-100);
+            color: var(--primary);
+        }
+
+        .filter-btn.active {
+            background: var(--primary);
+            color: white;
+        }
+
+        .search-container {
+            position: relative;
+            min-width: 300px;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 0.75rem 1rem 0.75rem 3rem;
+            border: 1px solid var(--gray-300);
+            border-radius: var(--border-radius);
+            font-size: 0.9rem;
+            transition: all 0.2s ease;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--gray-500);
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: var(--border-radius);
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+            color: white;
+        }
+
+        .btn-secondary {
+            background: white;
+            color: var(--gray-700);
+            border: 1px solid var(--gray-300);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        /* Professional Task Cards Grid */
+        .tasks-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 1.5rem;
+            margin-top: 2rem;
+        }
+
+        .task-card {
+            background: white;
+            border-radius: var(--border-radius-lg);
+            padding: 1.5rem;
+            box-shadow: var(--shadow-md);
+            border: 1px solid var(--gray-200);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .task-card:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-xl);
+        }
+
+        .task-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+            transition: width 0.3s ease;
+        }
+
+        .task-card.priority-low::before { background: var(--secondary); }
+        .task-card.priority-medium::before { background: var(--warning); }
+        .task-card.priority-high::before { background: var(--danger); }
+        .task-card.priority-urgent::before { background: #DC2626; }
+
+        .task-card:hover::before { width: 8px; }
+
+        .task-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 1rem;
+            gap: 1rem;
+        }
+
+        .task-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--gray-900);
+            line-height: 1.4;
+        }
+
+        .task-status {
+            padding: 0.375rem 0.875rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+        }
+
+        .status-pending {
+            background: linear-gradient(135deg, #FEF3C7, #FDE68A);
+            color: #92400E;
+        }
+
+        .status-pending_approval {
+            background: linear-gradient(135deg, #DBEAFE, #BFDBFE);
+            color: #1E40AF;
+        }
+
+        .status-completed {
+            background: linear-gradient(135deg, #D1FAE5, #A7F3D0);
+            color: #065F46;
+        }
+
+        .status-rejected {
+            background: linear-gradient(135deg, #FEE2E2, #FECACA);
+            color: #991B1B;
+        }
+
+        .task-meta {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            font-size: 0.85rem;
+            color: var(--gray-600);
+        }
+
+        .task-meta span {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .task-description {
+            color: var(--gray-700);
+            line-height: 1.6;
+            margin-bottom: 1.5rem;
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .task-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 1rem;
+            border-top: 1px solid var(--gray-200);
+        }
+
+        .task-due {
+            font-size: 0.85rem;
+            color: var(--gray-600);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .task-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .task-action-btn {
+            width: 36px;
+            height: 36px;
+            border: none;
+            border-radius: 8px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .task-action-btn.approve { background: var(--secondary); }
+        .task-action-btn.reject { background: var(--danger); }
+        .task-action-btn.edit { background: var(--accent); }
+        .task-action-btn.delete { background: var(--gray-500); }
+
+        .task-action-btn:hover {
+            transform: scale(1.1);
+            box-shadow: var(--shadow-md);
+        }
+
+        /* Enhanced Analytics Section */
+        .analytics-header {
+            margin-bottom: 2rem;
+        }
+
+        .analytics-controls {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+        }
+
+        .date-range {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+            background: white;
+            padding: 1rem;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--gray-200);
+        }
+
+        .date-input {
+            padding: 0.5rem;
+            border: 1px solid var(--gray-300);
+            border-radius: 6px;
+            font-size: 0.9rem;
+        }
+
+        .analytics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+
+        .analytics-card {
+            background: white;
+            border-radius: var(--border-radius-lg);
+            padding: 2rem;
+            box-shadow: var(--shadow-md);
+            border: 1px solid var(--gray-200);
+        }
+
+        .analytics-card h4 {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--gray-900);
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .chart-container {
+            height: 300px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--gray-50);
+            border-radius: var(--border-radius);
+            position: relative;
+        }
+
+        .chart-placeholder {
+            text-align: center;
+            color: var(--gray-500);
+        }
+
+        .metric-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 0;
+            border-bottom: 1px solid var(--gray-100);
+        }
+
+        .metric-row:last-child { border-bottom: none; }
+
+        .metric-label {
+            font-weight: 500;
+            color: var(--gray-700);
+        }
+
+        .metric-value {
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        /* Enhanced Tables */
+        .table-container {
+            background: white;
+            border-radius: var(--border-radius-lg);
+            overflow: hidden;
+            box-shadow: var(--shadow-md);
+            border: 1px solid var(--gray-200);
+        }
+
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .table th {
+            background: var(--gray-50);
+            padding: 1rem;
+            text-align: left;
+            font-weight: 600;
+            color: var(--gray-700);
+            border-bottom: 1px solid var(--gray-200);
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .table td {
+            padding: 1rem;
+            border-bottom: 1px solid var(--gray-100);
+            color: var(--gray-700);
+        }
+
+        .table tbody tr:hover {
+            background: var(--gray-50);
+        }
+
+        /* Modals */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(5px);
+            z-index: 1000;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .modal-content {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 2rem;
+            border-radius: var(--border-radius-lg);
+            box-shadow: var(--shadow-xl);
+            max-width: 500px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--gray-200);
+        }
+
+        .modal-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--gray-900);
+        }
+
+        .close-btn {
+            width: 32px;
+            height: 32px;
+            border: none;
+            background: var(--gray-100);
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--gray-600);
+            transition: all 0.2s ease;
+        }
+
+        .close-btn:hover {
+            background: var(--danger);
+            color: white;
+            transform: rotate(90deg);
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: var(--gray-700);
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid var(--gray-300);
+            border-radius: var(--border-radius);
+            font-size: 0.9rem;
+            transition: all 0.2s ease;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+        }
+
+        .form-actions {
+            display: flex;
+            gap: 1rem;
+            justify-content: flex-end;
+            margin-top: 2rem;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+            }
+
+            .sidebar.open {
+                transform: translateX(0);
+            }
+
+            .main-content {
+                margin-left: 0;
+            }
+
+            .content {
+                padding: 1rem;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .tasks-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .analytics-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Loading States */
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid var(--gray-200);
+            border-radius: 50%;
+            border-top-color: var(--primary);
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .skeleton {
+            background: linear-gradient(90deg, var(--gray-200) 25%, var(--gray-300) 50%, var(--gray-200) 75%);
+            background-size: 200% 100%;
+            animation: loading 1.5s ease-in-out infinite;
+            border-radius: var(--border-radius);
+        }
+
+        @keyframes loading {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+    </style>
 </head>
 <body>
     <div class="admin-container">
-        <header class="header">
+        <!-- Enhanced Sidebar -->
+        <aside class="sidebar">
             <div class="logo">
-                <h2>ATPL Admin</h2>
+                <h1>ATPL</h1>
+                <p>Task Management System</p>
             </div>
-            <nav class="nav">
-                <button class="nav-btn active" data-section="dashboard">Dashboard</button>
-                <button class="nav-btn" data-section="users">Users</button>
-                <button class="nav-btn" data-section="jobs">Jobs</button>
-                <button class="nav-btn" data-section="tasks">Tasks</button>
-                <button class="nav-btn" data-section="analytics">Analytics</button>
-            </nav>
-            <div class="user-info">
-                <span id="userInfo"></span>
-                <button id="logoutBtn" class="logout-btn">Logout</button>
-            </div>
-        </header>
-
-        <main class="main-content">
-            <!-- Dashboard Section -->
-            <section id="dashboard" class="section active">
-                <h3>Dashboard Overview</h3>
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <h4>Total Users</h4>
-                        <span id="totalUsers" class="stat-number">0</span>
-                    </div>
-                    <div class="stat-card">
-                        <h4>Total Jobs</h4>
-                        <span id="totalJobs" class="stat-number">0</span>
-                    </div>
-                    <div class="stat-card">
-                        <h4>Active Tasks</h4>
-                        <span id="activeTasks" class="stat-number">0</span>
-                    </div>
-                    <div class="stat-card">
-                        <h4>Pending Approvals</h4>
-                        <span id="pendingApprovals" class="stat-number">0</span>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Users Section -->
-            <section id="users" class="section">
-                <div class="section-header">
-                    <h3>User Management</h3>
-                    <button id="addUserBtn" class="btn btn-primary">Add User</button>
-                </div>
-                
-                <div class="search-bar">
-                    <input type="text" id="userSearch" placeholder="Search users...">
-                </div>
-
-                <div class="table-container">
-                    <table id="usersTable" class="data-table">
-                        <thead>
-                            <tr>
-                                <th>Username</th>
-                                <th>Email</th>
-                                <th>Department</th>
-                                <th>Role</th>
-                                <th>Created</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody></tbody>
-                    </table>
-                </div>
-            </section>
-
-            <!-- Jobs Section -->
-            <section id="jobs" class="section">
-                <div class="section-header">
-                    <h3>Job Management</h3>
-                    <div class="btn-group">
-                        <button id="addJobBtn" class="btn btn-primary">Add Job</button>
-                        <button id="uploadJobsBtn" class="btn btn-secondary">Upload Excel</button>
-                    </div>
-                </div>
-                
-                <div class="search-bar">
-                    <input type="text" id="jobSearch" placeholder="Search jobs...">
-                </div>
-
-                <div class="table-container">
-                    <table id="jobsTable" class="data-table">
-                        <thead>
-                            <tr>
-                                <th>Doc No</th>
-                                <th>Customer</th>
-                                <th>Item Code</th>
-                                <th>Description</th>
-                                <th>Qty</th>
-                                <th>Month</th>
-                                <th>Week</th>
-                                <th>Status</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody></tbody>
-                    </table>
-                </div>
-            </section>
-
-            <section id="tasks" class="section">
-                <div class="section-header">
-                    <h3>Task Management</h3>
-                    <button id="addTaskBtn" class="btn btn-primary">Create Task</button>
-                </div>
-                
-                <!-- ADD this search bar -->
-                <div class="search-bar">
-                    <input type="text" id="taskSearch" placeholder="Search tasks...">
-                </div>
-
-                <div id="tasksContainer" class="tasks-container"></div>
-            </section>
-
             
+            <nav class="nav-menu">
+                <div class="nav-item">
+                    <button class="nav-btn active" data-section="dashboard">
+                        <i class="fas fa-chart-line"></i>
+                        Dashboard
+                    </button>
+                </div>
+                <div class="nav-item">
+                    <button class="nav-btn" data-section="users">
+                        <i class="fas fa-users"></i>
+                        Users
+                    </button>
+                </div>
+                <div class="nav-item">
+                    <button class="nav-btn" data-section="jobs">
+                        <i class="fas fa-briefcase"></i>
+                        Jobs
+                    </button>
+                </div>
+                <div class="nav-item">
+                    <button class="nav-btn" data-section="tasks">
+                        <i class="fas fa-tasks"></i>
+                        Tasks
+                    </button>
+                </div>
+                <div class="nav-item">
+                    <button class="nav-btn" data-section="analytics">
+                        <i class="fas fa-analytics"></i>
+                        Analytics
+                    </button>
+                </div>
+            </nav>
+        </aside>
 
-            <!-- Analytics Section -->
-            <section id="analytics" class="section">
-                <div class="section-header">
-                    <h3>Analytics & Reports</h3>
-                    <button id="generateReportBtn" class="btn btn-primary">Generate Report</button>
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="header">
+                <h1 class="header-title" id="pageTitle">Dashboard Overview</h1>
+                <div class="user-info">
+                    <div class="user-avatar" id="userAvatar">A</div>
+                    <span id="userInfo">Admin User</span>
+                    <button class="logout-btn" id="logoutBtn">
+                        <i class="fas fa-sign-out-alt"></i>
+                        Logout
+                    </button>
                 </div>
-                
-                <div class="analytics-grid">
-                    <div class="analytics-card">
-                        <h4>User Performance</h4>
-                        <div id="userPerformanceChart" class="chart-container"></div>
+            </header>
+
+            <div class="content">
+                <!-- Dashboard Section -->
+                <section id="dashboard" class="section active">
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-header">
+                                <div>
+                                    <div class="stat-title">Total Users</div>
+                                    <div class="stat-number" id="totalUsers">0</div>
+                                    <div class="stat-change positive">
+                                        <i class="fas fa-arrow-up"></i>
+                                        Loading...
+                                    </div>
+                                </div>
+                                <div class="stat-icon users">
+                                    <i class="fas fa-users"></i>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="stat-card">
+                            <div class="stat-header">
+                                <div>
+                                    <div class="stat-title">Active Jobs</div>
+                                    <div class="stat-number" id="totalJobs">0</div>
+                                    <div class="stat-change positive">
+                                        <i class="fas fa-arrow-up"></i>
+                                        Loading...
+                                    </div>
+                                </div>
+                                <div class="stat-icon jobs">
+                                    <i class="fas fa-briefcase"></i>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="stat-card">
+                            <div class="stat-header">
+                                <div>
+                                    <div class="stat-title">Active Tasks</div>
+                                    <div class="stat-number" id="activeTasks">0</div>
+                                    <div class="stat-change negative">
+                                        <i class="fas fa-arrow-down"></i>
+                                        Loading...
+                                    </div>
+                                </div>
+                                <div class="stat-icon tasks">
+                                    <i class="fas fa-tasks"></i>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="stat-card">
+                            <div class="stat-header">
+                                <div>
+                                    <div class="stat-title">Pending Approvals</div>
+                                    <div class="stat-number" id="pendingApprovals">0</div>
+                                    <div class="stat-change positive">
+                                        <i class="fas fa-arrow-up"></i>
+                                        Loading...
+                                    </div>
+                                </div>
+                                <div class="stat-icon approvals">
+                                    <i class="fas fa-clock"></i>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="analytics-card">
-                        <h4>Task Distribution</h4>
-                        <div id="taskDistributionChart" class="chart-container"></div>
+                </section>
+
+                <!-- Users Section -->
+                <section id="users" class="section">
+                    <div class="section-header">
+                        <h3>User Management</h3>
+                        <div class="action-buttons">
+                            <button class="btn btn-secondary">
+                                <i class="fas fa-download"></i>
+                                Export Users
+                            </button>
+                            <button class="btn btn-primary" id="addUserBtn">
+                                <i class="fas fa-user-plus"></i>
+                                Add User
+                            </button>
+                        </div>
                     </div>
-                    <div class="analytics-card">
-                        <h4>Department Workload</h4>
-                        <div id="departmentWorkloadChart" class="chart-container"></div>
+
+                    <div class="search-bar">
+                        <input type="text" id="userSearch" placeholder="Search users..." />
                     </div>
-                    <div class="analytics-card">
-                        <h4>Job Status Flow</h4>
-                        <div id="jobStatusChart" class="chart-container"></div>
+
+                    <div class="table-container">
+                        <table class="table" id="usersTable">
+                            <thead>
+                                <tr>
+                                    <th>Username</th>
+                                    <th>Email</th>
+                                    <th>Department</th>
+                                    <th>Role</th>
+                                    <th>Created</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Dynamic content will be inserted here -->
+                            </tbody>
+                        </table>
                     </div>
-                </div>
-            </section>
+                </section>
+
+                <!-- Jobs Section -->
+                <section id="jobs" class="section">
+                    <div class="section-header">
+                        <h3>Job Management</h3>
+                        <div class="action-buttons">
+                            <button class="btn btn-secondary" id="uploadJobsBtn">
+                                <i class="fas fa-upload"></i>
+                                Import Excel
+                            </button>
+                            <button class="btn btn-primary" id="addJobBtn">
+                                <i class="fas fa-plus"></i>
+                                Add Job
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="search-bar">
+                        <input type="text" id="jobSearch" placeholder="Search jobs..." />
+                    </div>
+
+                    <div class="table-container">
+                        <table class="table" id="jobsTable">
+                            <thead>
+                                <tr>
+                                    <th>Doc No</th>
+                                    <th>Customer</th>
+                                    <th>Item Code</th>
+                                    <th>Description</th>
+                                    <th>Qty</th>
+                                    <th>Month</th>
+                                    <th>Week</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Dynamic content will be inserted here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- Enhanced Tasks Section -->
+                <section id="tasks" class="section">
+                    <div class="section-header">
+                        <h3>Task Management</h3>
+                        <div class="action-buttons">
+                            <button class="btn btn-secondary">
+                                <i class="fas fa-download"></i>
+                                Export
+                            </button>
+                            <button class="btn btn-primary" id="addTaskBtn">
+                                <i class="fas fa-plus"></i>
+                                Add Task
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="search-bar">
+                        <input type="text" id="taskSearch" placeholder="Search tasks..." />
+                    </div>
+
+                    <!-- Tasks will be dynamically loaded here -->
+                    <div id="tasksContainer">
+                        <div style="text-align: center; padding: 40px; color: #64748b;">
+                            <div class="loading"></div>
+                            <p>Loading tasks...</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Enhanced Analytics Section -->
+                <section id="analytics" class="section">
+                    <div class="section-header">
+                        <h3>Analytics & Reports</h3>
+                        <div class="action-buttons">
+                            <button class="btn btn-secondary">
+                                <i class="fas fa-download"></i>
+                                Export Report
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="analytics-overview">
+                        <div class="analytics-card">
+                            <h4>
+                                <i class="fas fa-chart-pie"></i>
+                                Task Distribution
+                            </h4>
+                            <div class="chart-container">
+                                <div class="chart-placeholder">
+                                    <div style="width: 200px; height: 200px; border-radius: 50%; background: conic-gradient(var(--primary) 0% 40%, var(--secondary) 40% 70%, var(--warning) 70% 85%, var(--danger) 85% 100%); margin: 0 auto 1rem;"></div>
+                                    <div class="metric-row">
+                                        <span class="metric-label">Completed Tasks</span>
+                                        <span class="metric-value">Loading...</span>
+                                    </div>
+                                    <div class="metric-row">
+                                        <span class="metric-label">In Progress</span>
+                                        <span class="metric-value">Loading...</span>
+                                    </div>
+                                    <div class="metric-row">
+                                        <span class="metric-label">Overdue</span>
+                                        <span class="metric-value">Loading...</span>
+                                    </div>
+                                    <div class="metric-row">
+                                        <span class="metric-label">Rejected</span>
+                                        <span class="metric-value">Loading...</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="analytics-card">
+                            <h4>
+                                <i class="fas fa-chart-line"></i>
+                                Performance Trends
+                            </h4>
+                            <div class="chart-container">
+                                <div class="chart-placeholder">
+                                    <div style="text-align: center; color: var(--gray-600);">
+                                        Performance trends will be displayed here
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="analytics-card">
+                            <h4>
+                                <i class="fas fa-users"></i>
+                                Team Performance
+                            </h4>
+                            <div class="chart-container">
+                                <div class="metric-row">
+                                    <span class="metric-label">Average Completion Rate</span>
+                                    <span class="metric-value">Loading...</span>
+                                </div>
+                                <div class="metric-row">
+                                    <span class="metric-label">On-Time Delivery</span>
+                                    <span class="metric-value">Loading...</span>
+                                </div>
+                                <div class="metric-row">
+                                    <span class="metric-label">Team Efficiency</span>
+                                    <span class="metric-value">Loading...</span>
+                                </div>
+                                <div class="metric-row">
+                                    <span class="metric-label">Active Members</span>
+                                    <span class="metric-value">Loading...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
         </main>
     </div>
 
-    <!-- Modals -->
+    <!-- Enhanced Modals -->
     <!-- Add User Modal -->
     <div id="addUserModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3>Add New User</h3>
-                <span class="close">&times;</span>
+                <h4 class="modal-title">Add New User</h4>
+                <button class="close">
+                    <i class="fas fa-times"></i>
+                </button>
             </div>
-            <form id="addUserForm" class="modal-form">
+            <form id="addUserForm">
                 <div class="form-group">
-                    <label for="newUsername">Username</label>
-                    <input type="text" id="newUsername" name="username" required>
+                    <label class="form-label">Username</label>
+                    <input type="text" name="username" class="form-input" required>
                 </div>
                 <div class="form-group">
-                    <label for="newEmail">Email</label>
-                    <input type="email" id="newEmail" name="email" required>
+                    <label class="form-label">Email</label>
+                    <input type="email" name="email" class="form-input" required>
                 </div>
                 <div class="form-group">
-                    <label for="newPassword">Password</label>
-                    <input type="password" id="newPassword" name="password" required>
+                    <label class="form-label">Password</label>
+                    <input type="password" name="password" class="form-input" required>
                 </div>
                 <div class="form-group">
-                    <label for="newDepartment">Department</label>
-                    <select id="newDepartment" name="department" required>
+                    <label class="form-label">Department</label>
+                    <select name="department" class="form-input" required>
                         <option value="">Select Department</option>
                         <option value="sales">Sales</option>
                         <option value="design">Design</option>
@@ -187,6 +1193,8 @@
                         <option value="purchase">Purchase</option>
                         <option value="production">Production</option>
                         <option value="quality">Quality</option>
+                        <option value="management">Management</option>
+                        <option value="administration">Administration</option>
                     </select>
                 </div>
                 <div class="form-actions">
@@ -201,59 +1209,56 @@
     <div id="addJobModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3>Add New Job</h3>
-                <span class="close">&times;</span>
+                <h4 class="modal-title">Add New Job</h4>
+                <button class="close">
+                    <i class="fas fa-times"></i>
+                </button>
             </div>
-            <form id="addJobForm" class="modal-form">
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="jobMonth">Month</label>
-                        <input type="text" id="jobMonth" name="month" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="jobDocNo">Doc No</label>
-                        <input type="text" id="jobDocNo" name="docNo" required>
-                    </div>
+            <form id="addJobForm">
+                <div class="form-group">
+                    <label class="form-label">Month</label>
+                    <input type="text" name="month" class="form-input" placeholder="e.g., Jan-2025" required>
                 </div>
                 <div class="form-group">
-                    <label for="jobCustomer">Customer Name</label>
-                    <input type="text" id="jobCustomer" name="customerName" required>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="jobItemCode">Item Code</label>
-                        <input type="text" id="jobItemCode" name="itemCode" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="jobQty">Quantity</label>
-                        <input type="number" id="jobQty" name="qty" required>
-                    </div>
+                    <label class="form-label">Document No</label>
+                    <input type="text" name="docNo" class="form-input" required>
                 </div>
                 <div class="form-group">
-                    <label for="jobDescription">Description</label>
-                    <textarea id="jobDescription" name="description" required></textarea>
+                    <label class="form-label">Customer Name</label>
+                    <input type="text" name="customerName" class="form-input" required>
                 </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="jobWeek">Week</label>
-                        <input type="text" id="jobWeek" name="week" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="jobStatus">Status</label>
-                        <select id="jobStatus" name="status" required>
-                            <option value="">Select Status</option>
-                            <option value="Sales Order received">Sales Order received</option>
-                            <option value="Drawing Approved">Drawing Approved</option>
-                            <option value="Long lead item detail given">Long lead item detail given</option>
-                            <option value="Drawing/BOM Issued">Drawing/BOM Issued</option>
-                            <option value="Production order and Purchase request prepared">Production order and Purchase request prepared</option>
-                            <option value="RM Received">RM Received</option>
-                            <option value="Production Started">Production Started</option>
-                            <option value="Production completed">Production completed</option>
-                            <option value="QC clear for Dispatch">QC clear for Dispatch</option>
-                            <option value="Dispatch clearance">Dispatch clearance</option>
-                        </select>
-                    </div>
+                <div class="form-group">
+                    <label class="form-label">Item Code</label>
+                    <input type="text" name="itemCode" class="form-input" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Description</label>
+                    <textarea name="description" class="form-input" rows="3" required></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Quantity</label>
+                    <input type="number" name="qty" class="form-input" min="1" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Week</label>
+                    <input type="text" name="week" class="form-input" placeholder="e.g., Week-1" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Status</label>
+                    <select name="status" class="form-input" required>
+                        <option value="">Select Status</option>
+                        <option value="sales order received">Sales Order Received</option>
+                        <option value="drawing approved">Drawing Approved</option>
+                        <option value="long lead item detail given">Long Lead Item Detail Given</option>
+                        <option value="drawing/bom issued">Drawing/BOM Issued</option>
+                        <option value="production order and purchase request prepared">Production Order and Purchase Request Prepared</option>
+                        <option value="rm received">RM Received</option>
+                        <option value="production started">Production Started</option>
+                        <option value="production completed">Production Completed</option>
+                        <option value="qc clear for dispatch">QC Clear for Dispatch</option>
+                        <option value="dispatch clearance">Dispatch Clearance</option>
+                        <option value="completed">Completed</option>
+                    </select>
                 </div>
                 <div class="form-actions">
                     <button type="button" class="btn btn-secondary" onclick="closeModal('addJobModal')">Cancel</button>
@@ -267,18 +1272,22 @@
     <div id="uploadJobsModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3>Upload Jobs via Excel</h3>
-                <span class="close">&times;</span>
+                <h4 class="modal-title">Upload Jobs from Excel</h4>
+                <button class="close">
+                    <i class="fas fa-times"></i>
+                </button>
             </div>
-            <form id="uploadJobsForm" class="modal-form">
+            <form id="uploadJobsForm" enctype="multipart/form-data">
                 <div class="form-group">
-                    <label for="excelFile">Excel File</label>
-                    <input type="file" id="excelFile" name="excel" accept=".xlsx,.xls" required>
-                    <small>Excel should contain columns: month, docNo, customerName, itemCode, description, qty, week, status</small>
+                    <label class="form-label">Excel File</label>
+                    <input type="file" id="excelFile" name="excel" class="form-input" accept=".xlsx,.xls" required>
+                    <small style="color: var(--gray-600); margin-top: 0.5rem; display: block;">
+                        Upload an Excel file with columns: month, docNo, customerName, itemCode, description, qty, week, status
+                    </small>
                 </div>
                 <div class="form-actions">
                     <button type="button" class="btn btn-secondary" onclick="closeModal('uploadJobsModal')">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Upload</button>
+                    <button type="submit" class="btn btn-primary">Upload Jobs</button>
                 </div>
             </form>
         </div>
@@ -288,41 +1297,42 @@
     <div id="addTaskModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3>Create New Task</h3>
-                <span class="close">&times;</span>
+                <h4 class="modal-title">Create New Task</h4>
+                <button class="close">
+                    <i class="fas fa-times"></i>
+                </button>
             </div>
-            <form id="addTaskForm" class="modal-form">
+            <form id="addTaskForm">
                 <div class="form-group">
-                    <label for="taskTitle">Task Title</label>
-                    <input type="text" id="taskTitle" name="title" required>
+                    <label class="form-label">Task Title</label>
+                    <input type="text" name="title" class="form-input" required>
                 </div>
                 <div class="form-group">
-                    <label for="taskDescription">Description</label>
-                    <textarea id="taskDescription" name="description" required></textarea>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="taskAssignTo">Assign To</label>
-                        <select id="taskAssignTo" name="assignedTo" multiple>
-                            <option value="">Select User</option>
-                            <option value="self">Self</option>
-                        </select>
-                        <small>Hold Ctrl/Cmd to select multiple users for manual tasks</small>
-                    </div>
-                    <div class="form-group">
-                        <label for="taskPriority">Priority</label>
-                        <select id="taskPriority" name="priority" required>
-                            <option value="">Select Priority</option>
-                            <option value="low">Low</option>
-                            <option value="medium">Medium</option>
-                            <option value="high">High</option>
-                            <option value="urgent">Urgent</option>
-                        </select>
-                    </div>
+                    <label class="form-label">Description</label>
+                    <textarea name="description" class="form-input" rows="4" required></textarea>
                 </div>
                 <div class="form-group">
-                    <label for="taskDueDate">Due Date</label>
-                    <input type="date" id="taskDueDate" name="dueDate" required>
+                    <label class="form-label">Assign To</label>
+                    <select id="taskAssignTo" name="assignedTo" class="form-input" multiple required>
+                        <option value="">Select User(s)</option>
+                    </select>
+                    <small style="color: var(--gray-600); margin-top: 0.5rem; display: block;">
+                        Hold Ctrl/Cmd to select multiple users
+                    </small>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Priority</label>
+                    <select name="priority" class="form-input" required>
+                        <option value="">Select Priority</option>
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                        <option value="urgent">Urgent</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Due Date</label>
+                    <input type="date" name="dueDate" class="form-input" required>
                 </div>
                 <div class="form-actions">
                     <button type="button" class="btn btn-secondary" onclick="closeModal('addTaskModal')">Cancel</button>

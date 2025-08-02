@@ -10,20 +10,28 @@ document.addEventListener('DOMContentLoaded', function () {
     checkAuth();
 
     // Navigation
-    const navButtons = document.querySelectorAll('.nav-btn');
+    const navTabs = document.querySelectorAll('.nav-tab');
     const sections = document.querySelectorAll('.section');
 
-    navButtons.forEach(btn => {
-        btn.addEventListener('click', function () {
+    // Navigation handler
+    navTabs.forEach(tab => {
+        tab.addEventListener('click', function () {
             const targetSection = this.dataset.section;
 
-            navButtons.forEach(b => b.classList.remove('active'));
+            // Update active states
+            navTabs.forEach(t => t.classList.remove('active'));
             sections.forEach(s => s.classList.remove('active'));
 
             this.classList.add('active');
-            document.getElementById(targetSection).classList.add('active');
+            const targetSectionElement = document.getElementById(targetSection);
+            if (targetSectionElement) {
+                targetSectionElement.classList.add('active');
+            }
 
-            loadSectionData(targetSection);
+            // Load section data using existing function
+            if (typeof loadSectionData === 'function') {
+                loadSectionData(targetSection);
+            }
         });
     });
 
@@ -79,6 +87,42 @@ document.addEventListener('DOMContentLoaded', function () {
             window.location.href = '/';
         }
     }
+
+    function updateDashboardStats() {
+        // This will be called by the main user.js file
+        // Just ensure the elements exist for the existing code to work with
+        const statsElements = [
+            'totalTasks', 'pendingTasks', 'completedTasks', 'overdue',
+            'dueToday', 'dueTomorrow', 'dueThisWeek', 'dueThisMonth'
+        ];
+
+        statsElements.forEach(id => {
+            const element = document.getElementById(id);
+            if (element && element.textContent === '0') {
+                element.textContent = 'Loading...';
+            }
+        });
+    }
+
+    // Call initially
+    updateDashboardStats();
+
+    function updateUserDisplay() {
+        const userInfo = localStorage.getItem('atpl_user_info');
+        if (userInfo) {
+            const user = JSON.parse(userInfo);
+            const userNameElement = document.getElementById('userName');
+            const userRoleElement = document.getElementById('userRole');
+            const userAvatarElement = document.getElementById('userAvatar');
+
+            if (userNameElement) userNameElement.textContent = user.username || 'User';
+            if (userRoleElement) userRoleElement.textContent = user.department || 'Department';
+            if (userAvatarElement) userAvatarElement.textContent = (user.username || 'U').charAt(0).toUpperCase();
+        }
+    }
+
+    // Call on load
+    updateUserDisplay();
 
     async function loadUsers() {
         try {
@@ -177,26 +221,40 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    // MODIFY THIS FUNCTION:
     async function loadTasks() {
         try {
             const response = await fetch(`${API_URL}/tasks`, {
                 headers: getAuthHeaders()
             });
             tasks = await response.json();
+
+            // ADD THIS LINE:
+            calculateAndUpdateStats();
+
             renderAllTasks();
         } catch (error) {
             showMessage('Error loading tasks', 'error');
         }
     }
 
+    // CHANGE THIS FUNCTION:
     async function loadDashboardStats() {
         try {
             const response = await fetch(`${API_URL}/dashboard/user`, {
                 headers: getAuthHeaders()
             });
             const stats = await response.json();
+
+            // ADD THESE LINES TO UPDATE THE MAIN DASHBOARD:
+            document.getElementById('totalTasks').textContent = stats.totalTasks || 0;
+            document.getElementById('pendingTasks').textContent = stats.pendingTasks || 0;
+            document.getElementById('completedTasks').textContent = stats.completedTasks || 0;
+            document.getElementById('overdueTasks').textContent = stats.overdueTasks || 0;
+
             updateDueDatesSection(stats);
         } catch (error) {
+            console.error('Error loading dashboard stats:', error);
             showMessage('Error loading dashboard stats', 'error');
         }
     }
@@ -207,6 +265,25 @@ document.addEventListener('DOMContentLoaded', function () {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
         };
+    }
+    // ADD THIS NEW FUNCTION:
+    function calculateAndUpdateStats() {
+        if (!tasks || tasks.length === 0) return;
+
+        const totalTasks = tasks.length;
+        const pendingTasks = tasks.filter(t => t.status === 'pending').length;
+        const completedTasks = tasks.filter(t => t.status === 'completed').length;
+        const overdueTasks = tasks.filter(t => {
+            const dueDate = new Date(t.dueDate);
+            const today = new Date();
+            return t.status === 'pending' && dueDate < today;
+        }).length;
+
+        // Update the dashboard display
+        document.getElementById('totalTasks').textContent = totalTasks;
+        document.getElementById('pendingTasks').textContent = pendingTasks;
+        document.getElementById('completedTasks').textContent = completedTasks;
+        document.getElementById('overdueTasks').textContent = overdueTasks;
     }
 
     function renderAllTasks() {
@@ -456,17 +533,20 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    // MODIFY THIS FUNCTION:
     function updateDueDatesSection(stats) {
-        document.getElementById('dueToday').textContent = stats.dueToday;
-        document.getElementById('dueTomorrow').textContent = stats.dueTomorrow;
-        document.getElementById('dueThisWeek').textContent = stats.dueThisWeek;
-        document.getElementById('dueThisMonth').textContent = stats.dueThisMonth;
+        // Update due dates display
+        document.getElementById('dueToday').textContent = stats.dueToday || 0;
+        document.getElementById('dueTomorrow').textContent = stats.dueTomorrow || 0;
+        document.getElementById('dueThisWeek').textContent = stats.dueThisWeek || 0;
+        document.getElementById('dueThisMonth').textContent = stats.dueThisMonth || 0;
 
-        // Render due tasks
-        renderDueTasks('dueTodayTasks', tasks.filter(t => isDueToday(t)));
-        renderDueTasks('dueTomorrowTasks', tasks.filter(t => isDueTomorrow(t)));
-        renderDueTasks('dueThisWeekTasks', tasks.filter(t => isDueThisWeek(t)));
-        renderDueTasks('dueThisMonthTasks', tasks.filter(t => isDueThisMonth(t)));
+        // Render due tasks in sidebar
+        const dueTodayTasks = tasks.filter(t => isDueToday(t));
+        const sidebarDueContainer = document.querySelector('.sidebar-widget #dueTodayTasks');
+        if (sidebarDueContainer) {
+            renderDueTasks('dueTodayTasks', dueTodayTasks);
+        }
     }
 
     function renderDueTasks(containerId, dueTasks) {
@@ -600,6 +680,36 @@ document.addEventListener('DOMContentLoaded', function () {
             this.closest('.modal').style.display = 'none';
         });
     });
+
+    document.querySelectorAll('.close-btn').forEach(btn => {
+        btn.addEventListener('click', function () {
+            this.closest('.modal').style.display = 'none';
+        });
+    });
+
+    // Modal background click handler
+    document.querySelectorAll('.modal').forEach(modal => {
+        modal.addEventListener('click', function (e) {
+            if (e.target === this) {
+                this.style.display = 'none';
+            }
+        });
+    });
+
+    window.openModal = function (modalId) {
+        const modal = document.getElementById(modalId);
+        if (modal) {
+            modal.style.display = 'block';
+        }
+    };
+
+    window.closeModal = function (modalId) {
+        const modal = document.getElementById(modalId);
+        if (modal) {
+            modal.style.display = 'none';
+        }
+    };
+
 
     // Complete task form
     document.getElementById('completeTaskForm').addEventListener('submit', async function (e) {

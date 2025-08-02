@@ -1,4 +1,4 @@
-// REPLACE the entire login.js content:
+
 document.addEventListener('DOMContentLoaded', function () {
     const loginForm = document.getElementById('loginForm');
     const errorMessage = document.getElementById('errorMessage');
