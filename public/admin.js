@@ -213,7 +213,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 tasks = [];
             }
 
-            console.log('Loaded tasks:', tasks.length);
             renderTasksContainer();
         } catch (error) {
             console.error('Error loading tasks:', error);
@@ -286,7 +285,6 @@ document.addEventListener('DOMContentLoaded', function () {
             tasks = [];
         }
 
-        console.log('Rendering tasks:', tasks.length);
 
         if (tasks.length === 0) {
             container.innerHTML = '<p style="text-align: center; color: #64748b; padding: 40px;">No tasks found</p>';
@@ -799,7 +797,6 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
-        console.log('Job tasks:', jobTasks);
         showMessage(`Found ${jobTasks.length} tasks for this job. Check console for details.`, 'info');
     };
 

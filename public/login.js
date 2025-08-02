@@ -78,7 +78,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 localStorage.removeItem('atpl_user_info');
             }
         } catch (error) {
-            console.log('No valid authentication found');
             localStorage.removeItem('atpl_auth_token');
             localStorage.removeItem('atpl_user_info');
         }

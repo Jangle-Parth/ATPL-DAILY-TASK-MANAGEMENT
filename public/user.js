@@ -133,11 +133,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 headers: getAuthHeaders()
             });
 
-            console.log('Colleagues response status:', response.status);
 
             if (response.ok) {
                 users = await response.json();
-                console.log('Loaded colleagues:', users);
 
                 if (users.length === 0) {
                     console.warn('No colleagues found! This might be because:');
@@ -167,7 +165,6 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
-        console.log('Populating dropdown with users:', users.length);
 
         // Clear existing options
         dropdown.innerHTML = '';
@@ -200,10 +197,8 @@ document.addEventListener('DOMContentLoaded', function () {
             option.value = user._id;
             option.textContent = `${user.username} (${user.department})`;
             dropdown.appendChild(option);
-            console.log('Added option:', user.username, user.department);
-        });
 
-        console.log('Dropdown populated with', dropdown.options.length - 1, 'colleagues');
+        });
     }
 
 
@@ -766,7 +761,6 @@ document.addEventListener('DOMContentLoaded', function () {
             dueDate: formData.get('dueDate')
         };
 
-        console.log('Assigning task to:', selectedUsers); // Debug log
 
         try {
             const response = await fetch(`${API_URL}/tasks/assign-peer`, {

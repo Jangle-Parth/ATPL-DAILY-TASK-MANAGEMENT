@@ -91,7 +91,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // Job Status Flow Configuration
 const statusFlow = {
-    'sales order received': { stage: 'sales', next: 'drawing approved', nextTask: 'Please approve drawing' },
+    'sales order received': { stage: 'sales', next: 'drawing approved', nextTask: 'Please Get the Drawing Approved' },
     'drawing approved': { stage: 'design', next: 'long lead item detail given', nextTask: 'Please provide long lead item details' },
     'long lead item detail given': { stage: 'design', next: 'drawing/bom issued', nextTask: 'Please issue drawing/BOM' },
     'drawing/bom issued': { stage: 'planning', next: 'production order and purchase request prepared', nextTask: 'Please release production order and purchase request' },
@@ -143,7 +143,7 @@ async function createAutoTask(job, status, assignedToId) {
 
         const taskData = {
             title: flowInfo.nextTask,
-            description: `Auto-generated task for Job ${job.docNo} - ${job.customerName}`,
+            description: `Auto-generated task for Job ${job.docNo} - ${job.customerName} (Item Code: ${job.itemCode}) `,
             assignedTo: [assignedToId],
             assignedBy: null, // System generated
             priority: 'medium',
@@ -248,7 +248,7 @@ app.post('/api/login', async (req, res) => {
             { expiresIn: '24h' }
         );
 
-        await logActivity('LOGIN', user._id, `User ${user.username} logged in`, req);
+        await logActivity('LOGIN', user._id, `User ${user.username} logged in `, req);
 
         res.json({
             success: true,
@@ -322,7 +322,7 @@ app.post('/api/users', requireAdmin, async (req, res) => {
             department
         });
 
-        await logActivity('USER_CREATED', req.userId, `Created user: ${username}`, req);
+        await logActivity('USER_CREATED', req.userId, `Created user: ${username} `, req);
 
         res.json({ success: true, message: 'User created successfully' });
     } catch (error) {
@@ -389,7 +389,7 @@ app.post('/api/jobs', requireAdmin, async (req, res) => {
             }
         }
 
-        await logActivity('JOB_CREATED', req.userId, `Created job: ${docNo} - ${customerName} - ${itemCode}`, req);
+        await logActivity('JOB_CREATED', req.userId, `Created job: ${docNo} - ${customerName} - ${itemCode} `, req);
         res.json({ success: true, message: 'Job created successfully' });
     } catch (error) {
         console.error('Error creating job:', error);
@@ -506,7 +506,7 @@ app.post('/api/jobs/upload', upload.single('excel'), async (req, res) => {
         // Process each row
         for (let i = 0; i < data.length; i++) {
             const row = data[i];
-            console.log(`Processing row ${i + 1}:`, row);
+            console.log(`Processing row ${i + 1}: `, row);
 
             try {
                 // Validate required fields with flexible column names
@@ -521,8 +521,8 @@ app.post('/api/jobs/upload', upload.single('excel'), async (req, res) => {
 
                 if (!month || !docNo || !customerName || !itemCode || !description || !qty || !week || !status) {
                     errorCount++;
-                    errors.push(`Row ${i + 1}: Missing required fields. Found: ${Object.keys(row).join(', ')}`);
-                    console.log(`Row ${i + 1} missing fields:`, {
+                    errors.push(`Row ${i + 1}: Missing required fields.Found: ${Object.keys(row).join(', ')} `);
+                    console.log(`Row ${i + 1} missing fields: `, {
                         month: !!month, docNo: !!docNo, customerName: !!customerName,
                         itemCode: !!itemCode, description: !!description, qty: !!qty,
                         week: !!week, status: !!status
@@ -534,7 +534,7 @@ app.post('/api/jobs/upload', upload.single('excel'), async (req, res) => {
                 const qtyNumber = parseInt(qty);
                 if (isNaN(qtyNumber) || qtyNumber <= 0) {
                     errorCount++;
-                    errors.push(`Row ${i + 1}: Invalid quantity value: ${qty}`);
+                    errors.push(`Row ${i + 1}: Invalid quantity value: ${qty} `);
                     continue;
                 }
 
@@ -575,7 +575,7 @@ app.post('/api/jobs/upload', upload.single('excel'), async (req, res) => {
                             await createAutoTask(job, status, departmentUsers[0]._id);
                             console.log(`Auto task created for job ${docNo}`);
                         } else {
-                            console.log(`No users found for department: ${flowInfo.stage}`);
+                            console.log(`No users found for department: ${flowInfo.stage} `);
                         }
                     } catch (taskError) {
                         console.error('Error creating auto task:', taskError);
@@ -584,16 +584,16 @@ app.post('/api/jobs/upload', upload.single('excel'), async (req, res) => {
                 }
 
                 successCount++;
-                console.log(`Successfully created job ${docNo}`);
+                console.log(`Successfully created job ${docNo} `);
 
             } catch (jobError) {
                 errorCount++;
-                console.error(`Error processing row ${i + 1}:`, jobError);
+                console.error(`Error processing row ${i + 1}: `, jobError);
 
                 if (jobError.code === 11000) {
-                    errors.push(`Row ${i + 1}: Duplicate document number ${row.docNo || 'unknown'}`);
+                    errors.push(`Row ${i + 1}: Duplicate document number ${row.docNo || 'unknown'} `);
                 } else {
-                    errors.push(`Row ${i + 1}: ${jobError.message}`);
+                    errors.push(`Row ${i + 1}: ${jobError.message} `);
                 }
             }
         }
@@ -612,7 +612,7 @@ app.post('/api/jobs/upload', upload.single('excel'), async (req, res) => {
             `Uploaded ${successCount} jobs, ${errorCount} errors`, req);
 
         const message = errorCount > 0
-            ? `Successfully uploaded ${successCount} jobs. ${errorCount} rows had errors.`
+            ? `Successfully uploaded ${successCount} jobs.${errorCount} rows had errors.`
             : `Successfully uploaded ${successCount} jobs.`;
 
         res.json({
@@ -778,7 +778,7 @@ app.post('/api/tasks/:id/reject', requireAuth, async (req, res) => {
 
         await task.save();
 
-        await logActivity('TASK_REJECTED', req.userId, `Rejected task: ${task.title}. Reason: ${reason}`, req);
+        await logActivity('TASK_REJECTED', req.userId, `Rejected task: ${task.title}.Reason: ${reason} `, req);
         res.json({ success: true, message: 'Task rejected successfully' });
     } catch (error) {
         console.error('Error rejecting task:', error);
@@ -811,7 +811,7 @@ app.delete('/api/tasks/:id', requireAuth, async (req, res) => {
 
         await Task.findByIdAndDelete(taskId);
 
-        await logActivity('TASK_DELETED', req.userId, `Deleted task: ${task.title}`, req);
+        await logActivity('TASK_DELETED', req.userId, `Deleted task: ${task.title} `, req);
         res.json({ success: true, message: 'Task deleted successfully' });
     } catch (error) {
         console.error('Error deleting task:', error);
@@ -955,7 +955,7 @@ app.post('/api/tasks/:id/complete', requireAuth, async (req, res) => {
                 }
             }
 
-            await logActivity('TASK_COMPLETED', req.userId, `Completed task: ${task.title}`, req);
+            await logActivity('TASK_COMPLETED', req.userId, `Completed task: ${task.title} `, req);
             return res.json({ success: true, message: 'Task submitted for approval' });
         }
 
@@ -996,7 +996,7 @@ app.post('/api/tasks/:id/complete', requireAuth, async (req, res) => {
                 'Task submitted for approval (all assignees completed)' :
                 'Your completion recorded. Waiting for other assignees.';
 
-            await logActivity('TASK_COMPLETED', req.userId, `Completed task: ${task.title}`, req);
+            await logActivity('TASK_COMPLETED', req.userId, `Completed task: ${task.title} `, req);
             return res.json({ success: true, message });
         }
 
@@ -1008,7 +1008,7 @@ app.post('/api/tasks/:id/complete', requireAuth, async (req, res) => {
 
         await task.save();
 
-        await logActivity('TASK_COMPLETED', req.userId, `Completed task: ${task.title}`, req);
+        await logActivity('TASK_COMPLETED', req.userId, `Completed task: ${task.title} `, req);
         res.json({ success: true, message: 'Task submitted for approval' });
 
     } catch (error) {
@@ -1081,13 +1081,13 @@ app.post('/api/tasks/assign-peer', requireAuth, async (req, res) => {
         const task = await Task.create(taskData);
 
         const usernames = assignees.map(u => u.username).join(', ');
-        await logActivity('PEER_TASK_ASSIGNED', req.userId, `Assigned task: ${title} to ${usernames}`, req);
+        await logActivity('PEER_TASK_ASSIGNED', req.userId, `Assigned task: ${title} to ${usernames} `, req);
 
         console.log('Task created successfully:', task._id);
 
         res.json({
             success: true,
-            message: `Task assigned successfully to ${assignees.length} colleague(s): ${usernames}`,
+            message: `Task assigned successfully to ${assignees.length} colleague(s): ${usernames} `,
             taskId: task._id
         });
     } catch (error) {
@@ -1216,7 +1216,7 @@ app.post('/api/tasks/:id/approve', requireAuth, async (req, res) => {
 
         await task.save();
 
-        await logActivity('TASK_APPROVED', req.userId, `Approved task: ${task.title}`, req);
+        await logActivity('TASK_APPROVED', req.userId, `Approved task: ${task.title} `, req);
         res.json({ success: true, message: 'Task approved successfully' });
     } catch (error) {
         console.error('Error approving task:', error);
@@ -1369,7 +1369,7 @@ app.put('/api/tasks/:id/status', requireAuth, async (req, res) => {
         await task.save();
 
         await logActivity('TASK_STATUS_CHANGED', req.userId,
-            `Changed task ${task._id} status from ${oldStatus} to ${status}. Reason: ${reason}`, req);
+            `Changed task ${task._id} status from ${oldStatus} to ${status}.Reason: ${reason} `, req);
 
         res.json({ success: true, message: 'Task status updated' });
     } catch (error) {
@@ -1447,12 +1447,12 @@ app.post('/api/tasks/bulk', requireAdmin, async (req, res) => {
                     }
                 }
             } catch (error) {
-                console.error(`Error processing task ${taskId}:`, error);
+                console.error(`Error processing task ${taskId}: `, error);
             }
         }
 
         await logActivity('BULK_TASK_ACTION', req.userId,
-            `Performed ${action} on ${updatedCount} tasks. Reason: ${reason || 'N/A'}`, req);
+            `Performed ${action} on ${updatedCount} tasks.Reason: ${reason || 'N/A'} `, req);
 
         res.json({ success: true, message: `${action} applied to ${updatedCount} tasks` });
     } catch (error) {
@@ -1673,7 +1673,7 @@ app.put('/api/jobs/:id/status', requireAdmin, async (req, res) => {
         }
 
         await logActivity('JOB_STATUS_UPDATED', req.userId,
-            `Updated job ${job.docNo} status from ${oldStatus} to ${status}`, req);
+            `Updated job ${job.docNo} status from ${oldStatus} to ${status} `, req);
 
         res.json({ success: true, message: 'Job status updated' });
     } catch (error) {
@@ -1747,7 +1747,7 @@ app.get('/api/export/:type', requireAdmin, async (req, res) => {
         }
 
         res.setHeader('Content-Type', 'application/json');
-        res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
+        res.setHeader('Content-Disposition', `attachment; filename = ${filename} `);
         res.json(data);
 
         await logActivity('DATA_EXPORTED', req.userId, `Exported ${type} data`, req);
@@ -1882,5 +1882,5 @@ app.use((err, req, res, next) => {
 
 // Start server
 app.listen(PORT, () => {
-    console.log(`ATPL Task Management System running on port ${PORT}`);
+    console.log(`ATPL Task Management System running on port ${PORT} `);
 });
