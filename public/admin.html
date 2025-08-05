@@ -1024,27 +1024,111 @@
                         <input type="text" id="jobSearch" placeholder="Search jobs..." />
                     </div>
 
-                    <div class="table-container">
-                        <table class="table" id="jobsTable">
-                            <thead>
-                                <tr>
-                                    <th>Doc No</th>
-                                    <th>Customer</th>
-                                    <th>Item Code</th>
-                                    <th>Description</th>
-                                    <th>Qty</th>
-                                    <th>Month</th>
-                                    <th>Week</th>
-                                    <th>Status</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <!-- Dynamic content will be inserted here -->
-                            </tbody>
-                        </table>
-                    </div>
-                </section>
+                    <div class="table-container" style="overflow-x: auto;">
+        <table class="table" id="jobsTable" style="min-width: 1200px;">
+            <thead>
+                <tr>
+                    <th style="position: relative; min-width: 120px;">
+                        Doc No
+                        <div class="column-filter" style="margin-top: 5px;">
+                            <input type="text" id="docNoFilter" placeholder="Filter..." 
+                                   style="width: 100%; padding: 4px; font-size: 0.8rem; border: 1px solid #ddd; border-radius: 4px;">
+                        </div>
+                    </th>
+                    <th style="position: relative; min-width: 150px;">
+                        Customer
+                        <div class="column-filter" style="margin-top: 5px;">
+                            <input type="text" id="customerFilter" placeholder="Filter..." 
+                                   style="width: 100%; padding: 4px; font-size: 0.8rem; border: 1px solid #ddd; border-radius: 4px;">
+                        </div>
+                    </th>
+                    <th style="position: relative; min-width: 120px;">
+                        Item Code
+                        <div class="column-filter" style="margin-top: 5px;">
+                            <input type="text" id="itemCodeFilter" placeholder="Filter..." 
+                                   style="width: 100%; padding: 4px; font-size: 0.8rem; border: 1px solid #ddd; border-radius: 4px;">
+                        </div>
+                    </th>
+                    <th style="position: relative; min-width: 200px;">
+                        Description
+                        <div class="column-filter" style="margin-top: 5px;">
+                            <input type="text" id="descriptionFilter" placeholder="Filter..." 
+                                   style="width: 100%; padding: 4px; font-size: 0.8rem; border: 1px solid #ddd; border-radius: 4px;">
+                        </div>
+                    </th>
+                    <th style="position: relative; min-width: 80px;">
+                        Qty
+                        <div class="column-filter" style="margin-top: 5px;">
+                            <input type="number" id="qtyFilter" placeholder="Min..." 
+                                   style="width: 100%; padding: 4px; font-size: 0.8rem; border: 1px solid #ddd; border-radius: 4px;">
+                        </div>
+                    </th>
+                    <th style="position: relative; min-width: 100px;">
+                        Month
+                        <div class="column-filter" style="margin-top: 5px;">
+                            <input type="text" id="monthFilter" placeholder="Filter..." 
+                                   style="width: 100%; padding: 4px; font-size: 0.8rem; border: 1px solid #ddd; border-radius: 4px;">
+                        </div>
+                    </th>
+                    <th style="position: relative; min-width: 80px;">
+                        Week
+                        <div class="column-filter" style="margin-top: 5px;">
+                            <input type="text" id="weekFilter" placeholder="Filter..." 
+                                   style="width: 100%; padding: 4px; font-size: 0.8rem; border: 1px solid #ddd; border-radius: 4px;">
+                        </div>
+                    </th>
+                    <th style="position: relative; min-width: 150px;">
+                        Status
+                        <div class="column-filter" style="margin-top: 5px;">
+                            <select id="statusJobFilter" 
+                                    style="width: 100%; padding: 4px; font-size: 0.8rem; border: 1px solid #ddd; border-radius: 4px;">
+                                <option value="">All Status</option>
+                                <option value="sales order received">Sales Order Received</option>
+                                <option value="drawing approved">Drawing Approved</option>
+                                <option value="long lead item detail given">Long Lead Item Detail Given</option>
+                                <option value="drawing/bom issued">Drawing/BOM Issued</option>
+                                <option value="production order and purchase request prepared">Production Order Prepared</option>
+                                <option value="rm received">RM Received</option>
+                                <option value="production started">Production Started</option>
+                                <option value="production completed">Production Completed</option>
+                                <option value="qc clear for dispatch">QC Clear for Dispatch</option>
+                                <option value="dispatch clearance">Dispatch Clearance</option>
+                                <option value="completed">Completed</option>
+                                <option value="hold">Hold</option>
+                                <option value="hold cleared">Hold Cleared</option>
+                                <option value="so cancelled">SO Cancelled</option>
+                            </select>
+                        </div>
+                    </th>
+                    <th style="position: relative; min-width: 120px;">
+                        Due Date
+                        <div class="column-filter" style="margin-top: 5px;">
+                            <input type="date" id="dueDateFilter" 
+                                   style="width: 100%; padding: 4px; font-size: 0.8rem; border: 1px solid #ddd; border-radius: 4px;">
+                        </div>
+                    </th>
+                    <th style="min-width: 100px;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Dynamic content will be inserted here -->
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- Filter Controls -->
+    <div style="margin-top: 1rem; display: flex; gap: 0.5rem; align-items: center;">
+        <button class="btn btn-primary btn-small" id="applyJobFilters">
+            <i class="fas fa-filter"></i>
+            Apply Filters
+        </button>
+        <button class="btn btn-secondary btn-small" id="clearJobFilters">
+            <i class="fas fa-times"></i>
+            Clear All
+        </button>
+        <span id="jobFilterResults" style="margin-left: 1rem; font-size: 0.9rem; color: #64748b;"></span>
+    </div>
+</section>
 
                 <!-- Enhanced Tasks Section -->
                 <section id="tasks" class="section">
@@ -1066,15 +1150,96 @@
                         <input type="text" id="taskSearch" placeholder="Search tasks..." />
                     </div>
 
-                    <!-- Tasks will be dynamically loaded here -->
-                    <div id="tasksContainer">
-                        <div style="text-align: center; padding: 40px; color: #64748b;">
-                            <div class="loading"></div>
-                            <p>Loading tasks...</p>
-                        </div>
-                    </div>
-                </section>
+                    <div class="tasks-filters-section" style="background: white; padding: 1.5rem; border-radius: 12px; margin-bottom: 2rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+        <div class="filters-row" style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; margin-bottom: 1rem;">
+            <div class="filter-group">
+                <label style="font-size: 0.85rem; font-weight: 600; margin-bottom: 0.5rem; display: block;">Search</label>
+                <input type="text" id="taskSearch" placeholder="Search tasks..." style="padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px; min-width: 200px;">
+            </div>
+            
+            <div class="filter-group">
+                <label style="font-size: 0.85rem; font-weight: 600; margin-bottom: 0.5rem; display: block;">User</label>
+                <select id="userFilter" style="padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px; min-width: 150px;">
+                    <option value="">All Users</option>
+                    <!-- Dynamic options will be populated -->
+                </select>
+            </div>
+            
+            <div class="filter-group">
+                <label style="font-size: 0.85rem; font-weight: 600; margin-bottom: 0.5rem; display: block;">Status</label>
+                <select id="statusFilter" style="padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px; min-width: 120px;">
+                    <option value="">All Status</option>
+                    <option value="pending">Pending</option>
+                    <option value="pending_approval">Pending Approval</option>
+                    <option value="completed">Completed</option>
+                    <option value="rejected">Rejected</option>
+                </select>
+            </div>
+            
+            <div class="filter-group">
+                <label style="font-size: 0.85rem; font-weight: 600; margin-bottom: 0.5rem; display: block;">Type</label>
+                <select id="typeFilter" style="padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px; min-width: 120px;">
+                    <option value="">All Types</option>
+                    <option value="job-auto">Job Auto</option>
+                    <option value="admin">Admin</option>
+                    <option value="user">User</option>
+                    <option value="manual">Manual</option>
+                    <option value="super-admin">Super Admin</option>
+                </select>
+            </div>
+            
+            <div class="filter-group">
+                <label style="font-size: 0.85rem; font-weight: 600; margin-bottom: 0.5rem; display: block;">Priority</label>
+                <select id="priorityFilter" style="padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px; min-width: 120px;">
+                    <option value="">All Priority</option>
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                    <option value="urgent">Urgent</option>
+                </select>
+            </div>
+            
+            <div class="filter-group">
+                <label style="font-size: 0.85rem; font-weight: 600; margin-bottom: 0.5rem; display: block;">Department</label>
+                <select id="departmentFilter" style="padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px; min-width: 150px;">
+                    <option value="">All Departments</option>
+                    <option value="sales">Sales</option>
+                    <option value="design">Design</option>
+                    <option value="planning">Planning</option>
+                    <option value="purchase">Purchase</option>
+                    <option value="production">Production</option>
+                    <option value="quality">Quality</option>
+                    <option value="management">Management</option>
+                </select>
+            </div>
+        </div>
+        
+        <div class="filter-actions" style="display: flex; gap: 0.5rem;">
+            <button class="btn btn-primary btn-small" id="applyFilters">
+                <i class="fas fa-filter"></i>
+                Apply Filters
+            </button>
+            <button class="btn btn-secondary btn-small" id="clearFilters">
+                <i class="fas fa-times"></i>
+                Clear All
+            </button>
+        </div>
+        
+        <!-- Filter Results Info -->
+        <div id="filterResultsInfo" style="margin-top: 1rem; font-size: 0.9rem; color: #64748b; display: none;">
+            <!-- Dynamic filter results info -->
+        </div>
+    </div>
 
+    <!-- Tasks will be dynamically loaded here -->
+    <div id="tasksContainer">
+        <div style="text-align: center; padding: 40px; color: #64748b;">
+            <div class="loading"></div>
+            <p>Loading tasks...</p>
+        </div>
+    </div>
+</section>
+               
                 <!-- Enhanced Analytics Section -->
                 <section id="analytics" class="section">
                     <div class="section-header">

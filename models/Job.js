@@ -46,7 +46,10 @@ const jobSchema = new mongoose.Schema({
             'production completed',
             'qc clear for dispatch',
             'dispatch clearance',
-            'completed'
+            'completed',
+            'hold',              // NEW
+            'hold cleared',      // NEW
+            'so cancelled'
         ],
         default: 'sales order received'
     },

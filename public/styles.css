@@ -1376,6 +1376,85 @@ input[type="radio"] {
         font-size: 2.5rem;
     }
 
+    .btn-small {
+        padding: 0.375rem 0.75rem;
+        font-size: 0.8rem;
+        margin: 0 2px;
+        border-radius: 4px;
+        border: none;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .btn-small.btn-primary {
+        background: #4f46e5;
+        color: white;
+    }
+
+    .btn-small.btn-warning {
+        background: #f59e0b;
+        color: white;
+    }
+
+    .btn-small:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+
+    .status-completed {
+        background: linear-gradient(135deg, #D1FAE5, #A7F3D0);
+        color: #065F46;
+        padding: 0.25rem 0.5rem;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+
+    .status-rejected {
+        background: linear-gradient(135deg, #FEE2E2, #FECACA);
+        color: #991B1B;
+        padding: 0.25rem 0.5rem;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+
+    .status-overdue {
+        background: linear-gradient(135deg, #FED7D7, #FEB2B2);
+        color: #C53030;
+        padding: 0.25rem 0.5rem;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+
+    .status-pending {
+        background: linear-gradient(135deg, #FEF3C7, #FDE68A);
+        color: #92400E;
+        padding: 0.25rem 0.5rem;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+
+    #jobsTable th {
+        background: #f8fafc;
+        font-weight: 700;
+        font-size: 0.85rem;
+        padding: 0.75rem;
+        border-bottom: 2px solid #e2e8f0;
+    }
+
+    #jobsTable td {
+        padding: 0.75rem;
+        border-bottom: 1px solid #e2e8f0;
+        font-size: 0.9rem;
+    }
+
+    #jobsTable tbody tr:hover {
+        background: #f8fafc;
+    }
+
     .modal-content {
         padding: 1.5rem;
         width: 95%;

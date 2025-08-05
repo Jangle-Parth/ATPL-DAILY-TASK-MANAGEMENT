@@ -100,7 +100,10 @@ const statusFlow = {
     'production started': { stage: 'production', next: 'production completed', nextTask: 'Please complete production' },
     'production completed': { stage: 'quality', next: 'qc clear for dispatch', nextTask: 'Please clear QC for dispatch' },
     'qc clear for dispatch': { stage: 'sales', next: 'dispatch clearance', nextTask: 'Please provide dispatch clearance' },
-    'dispatch clearance': { stage: 'production', next: 'completed', nextTask: 'Order completed' }
+    'dispatch clearance': { stage: 'production', next: 'completed', nextTask: 'Order completed' },
+    'hold': { stage: 'sales', next: 'hold cleared', nextTask: 'Please clear the hold status and update next stage' },
+    'hold cleared': { stage: 'sales', next: 'drawing approved', nextTask: 'Please Get the Drawing Approved' }, // Resume normal flow
+    'so cancelled': { stage: 'sales', next: null, nextTask: null } // Terminal status - no next task
 };
 
 async function logActivity(action, userId, details, req = null) {
@@ -139,14 +142,21 @@ async function createAutoTask(job, status, assignedToId) {
         const statusKey = status.toLowerCase();
         const flowInfo = statusFlow[statusKey];
 
-        if (!flowInfo || !flowInfo.nextTask) return null;
+        if (!flowInfo || !flowInfo.nextTask) {
+            // For 'so cancelled' status, don't create any task
+            if (statusKey === 'so cancelled') {
+                await logActivity('JOB_CANCELLED', 'system', `Job ${job.docNo} - ${job.customerName} was cancelled`);
+                return null;
+            }
+            return null;
+        }
 
         const taskData = {
             title: flowInfo.nextTask,
             description: `Auto-generated task for Job ${job.docNo} - ${job.customerName} (Item Code: ${job.itemCode}) `,
             assignedTo: [assignedToId],
             assignedBy: null, // System generated
-            priority: 'medium',
+            priority: statusKey === 'hold' ? 'high' : 'medium',
             status: 'pending',
             type: 'job-auto',
             jobId: job._id,
@@ -159,7 +169,7 @@ async function createAutoTask(job, status, assignedToId) {
                 currentStage: flowInfo.stage,
                 nextStage: flowInfo.next
             },
-            dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days from now
+            dueDate: new Date(Date.now() + (statusKey === 'hold' ? 3 : 7) * 24 * 60 * 60 * 1000)
         };
 
         const task = await Task.create(taskData);
@@ -217,8 +227,6 @@ async function requireAdmin(req, res, next) {
         return res.status(401).json({ error: 'Invalid or expired token' });
     }
 }
-// // Seed database on startup
-// seedDatabase();
 
 app.post('/api/login', async (req, res) => {
     try {

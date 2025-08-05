@@ -5,10 +5,64 @@ document.addEventListener('DOMContentLoaded', function () {
     const API_URL = 'https://atpl-daily-task-management.onrender.com/api';
     // const API_URL = 'http://localhost:3000/api';
     let users = [];
+    const groupedTaskStyles = `
+<style>
+.job-group-card .complete-all-btn:hover {
+    background: #059669 !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+}
+
+.job-group-card .expand-btn:hover {
+    background: #2563eb !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+}
+
+.task-item {
+    transform: translateX(0);
+    transition: all 0.3s ease;
+}
+
+.task-item:hover {
+    transform: translateX(4px);
+}
+
+@media (max-width: 768px) {
+    .job-group-card {
+        padding: 12px !important;
+        margin-bottom: 12px !important;
+    }
+    
+    .job-group-card h3 {
+        font-size: 1rem !important;
+    }
+    
+    .complete-all-btn, .expand-btn {
+        padding: 6px 10px !important;
+        font-size: 0.8rem !important;
+    }
+    
+    .task-item {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 8px;
+    }
+    
+    .task-item > div:last-child {
+        align-self: flex-end;
+    }
+}
+</style>
+`;
+
+    // Inject the styles
+    document.head.insertAdjacentHTML('beforeend', groupedTaskStyles);
 
 
     // Check authentication
     checkAuth();
+    updateTasksGridStyles();
 
     // Navigation
     const navTabs = document.querySelectorAll('.nav-tab');
@@ -30,9 +84,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             // Load section data using existing function
-            if (typeof loadSectionData === 'function') {
-                loadSectionData(targetSection);
-            }
+            loadSectionData(targetSection);
         });
     });
 
@@ -229,6 +281,10 @@ document.addEventListener('DOMContentLoaded', function () {
             calculateAndUpdateStats();
 
             renderAllTasks();
+            const activeTab = document.querySelector('.nav-tab.active');
+            if (activeTab && activeTab.dataset.section === 'job-entry') {
+                renderTasksByType('job-entry', 'jobEntryTasksContainer');
+            }
         } catch (error) {
             showMessage('Error loading tasks', 'error');
         }
@@ -301,55 +357,318 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
+        // Create compact grid container
+        const gridContainer = document.createElement('div');
+        gridContainer.className = 'tasks-grid';
+
         tasksAssignedToMe.forEach(task => {
-            container.appendChild(createTaskCard(task));
+            gridContainer.appendChild(createTaskCard(task));
         });
+
+        container.appendChild(gridContainer);
     }
 
     function renderTasksByType(type, containerId) {
         const container = document.getElementById(containerId);
         container.innerHTML = '';
 
+        console.log('Rendering tasks by type:', type, 'Total tasks:', tasks.length);
+
         const filteredTasks = tasks.filter(task => {
-            // First, exclude tasks assigned BY current user (they should only appear in "My Assigned Tasks")
-            if (task.assignedBy && (task.assignedBy._id === currentUser.id || task.assignedBy === currentUser.id)) {
-                return false; // Don't show tasks I assigned in other sections
+            // First, ensure task is assigned TO current user, not BY current user
+            const isAssignedToMe = Array.isArray(task.assignedTo)
+                ? task.assignedTo.some(assignee => (assignee._id || assignee) === currentUser.id)
+                : (task.assignedTo._id || task.assignedTo) === currentUser.id;
+
+            if (!isAssignedToMe) {
+                return false;
             }
 
             // Then filter by type for tasks assigned TO current user
-            if (type === 'job-entry') return task.type === 'job-auto';
+            if (type === 'job-entry') {
+                return task.type === 'job-auto';
+            }
             if (type === 'super-admin') return task.type === 'super-admin';
             if (type === 'admin') return task.type === 'admin';
             if (type === 'user-assigned') return task.type === 'user' || task.type === 'manual';
             return false;
         });
 
+        console.log('Filtered tasks for', type, ':', filteredTasks.length);
+
         if (filteredTasks.length === 0) {
             container.innerHTML = `<p style="text-align: center; color: #64748b; padding: 40px;">No ${type.replace('-', ' ')} tasks assigned to you</p>`;
             return;
         }
 
-        // Group job-entry tasks by docNo and customer
+        // IMPORTANT: Use the NEW enhanced grouping for job-entry tasks
         if (type === 'job-entry') {
             const groupedTasks = groupTasksByJob(filteredTasks);
             renderGroupedTasks(container, groupedTasks);
         } else {
+
             filteredTasks.forEach(task => {
                 container.appendChild(createTaskCard(task));
             });
         }
     }
 
+
+    function renderJobEntryTasks(container, jobTasks) {
+        console.log('Rendering job entry tasks:', jobTasks.length);
+
+        // Group tasks by stage + docNo combination for tasks with same title/stage
+        const groupedTasks = {};
+
+        jobTasks.forEach(task => {
+            if (task.jobDetails) {
+                // Create a more specific grouping key that includes the task title (stage)
+                const groupKey = `${task.title}-${task.jobDetails.docNo}`;
+
+                if (!groupedTasks[groupKey]) {
+                    groupedTasks[groupKey] = {
+                        title: task.title, // The task title (e.g., "Please provide long lead item details")
+                        stage: task.jobDetails.currentStage || 'Unknown Stage',
+                        docNo: task.jobDetails.docNo || 'Unknown Doc',
+                        customerName: task.jobDetails.customerName || 'Unknown Customer',
+                        dueDate: task.dueDate,
+                        priority: task.priority,
+                        status: task.status,
+                        tasks: []
+                    };
+                }
+                groupedTasks[groupKey].tasks.push(task);
+            }
+        });
+
+        console.log('Grouped job tasks:', Object.keys(groupedTasks).length, 'groups');
+
+        if (Object.keys(groupedTasks).length === 0) {
+            container.innerHTML = '<p style="text-align: center; color: #64748b; padding: 40px;">No job entry tasks found</p>';
+            return;
+        }
+
+        // Sort groups by priority and due date
+        const sortedGroups = Object.values(groupedTasks).sort((a, b) => {
+            // First sort by status (pending first)
+            if (a.status !== b.status) {
+                const statusOrder = { 'pending': 0, 'pending_approval': 1, 'completed': 2 };
+                return statusOrder[a.status] - statusOrder[b.status];
+            }
+            // Then by priority
+            const priorityOrder = { 'urgent': 0, 'high': 1, 'medium': 2, 'low': 3 };
+            if (a.priority !== b.priority) {
+                return priorityOrder[a.priority] - priorityOrder[b.priority];
+            }
+            // Finally by due date
+            return new Date(a.dueDate) - new Date(b.dueDate);
+        });
+
+        // Create grouped display
+        sortedGroups.forEach(group => {
+            const isOverdue = new Date() > new Date(group.dueDate) && group.status === 'pending';
+            const canComplete = group.status === 'pending';
+
+            const groupCard = document.createElement('div');
+            groupCard.className = 'job-group-card';
+            groupCard.style.cssText = `
+            background: white;
+            border-radius: 12px;
+            padding: 18px;
+            margin-bottom: 16px;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
+            border: 1px solid #e5e7eb;
+            border-left: 4px solid ${getPriorityColor(group.priority)};
+            transition: all 0.3s ease;
+            position: relative;
+        `;
+
+            // Add hover effect
+            groupCard.addEventListener('mouseenter', () => {
+                groupCard.style.transform = 'translateY(-2px)';
+                groupCard.style.boxShadow = '0 8px 25px rgba(0, 0, 0, 0.12)';
+            });
+
+            groupCard.addEventListener('mouseleave', () => {
+                groupCard.style.transform = 'translateY(0)';
+                groupCard.style.boxShadow = '0 3px 10px rgba(0, 0, 0, 0.08)';
+            });
+
+            groupCard.innerHTML = `
+            <!-- Group Header -->
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px;">
+                <div style="flex: 1;">
+                    <h3 style="color: #1e293b; margin: 0 0 6px 0; font-size: 1.1rem; font-weight: 700; line-height: 1.3;">
+                        ${group.title}
+                    </h3>
+                    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 6px;">
+                        <span style="background: #f1f5f9; padding: 4px 8px; border-radius: 6px; font-size: 0.8rem; font-weight: 600; color: #475569;">
+                            📋 Doc: ${group.docNo}
+                        </span>
+                        <span style="font-size: 0.85rem; color: #64748b;">
+                            Stage: <strong>${group.stage}</strong>
+                        </span>
+                        <span style="
+                            padding: 3px 8px; 
+                            border-radius: 10px; 
+                            font-size: 0.75rem; 
+                            font-weight: 600; 
+                            background: ${group.priority === 'urgent' ? '#fee2e2' : group.priority === 'high' ? '#fed7d7' : group.priority === 'medium' ? '#fef3c7' : '#dcfce7'};
+                            color: ${group.priority === 'urgent' ? '#991b1b' : group.priority === 'high' ? '#c53030' : group.priority === 'medium' ? '#92400e' : '#166534'};
+                        ">
+                            ${group.priority.toUpperCase()}
+                        </span>
+                    </div>
+                    <div style="font-size: 0.8rem; color: #64748b;">
+                        📅 Due: ${new Date(group.dueDate).toLocaleDateString()}
+                        ${isOverdue ? '<span style="color: #ef4444; font-weight: 600; margin-left: 8px;">⚠️ OVERDUE</span>' : ''}
+                        | Items: ${group.tasks.length}
+                    </div>
+                </div>
+                
+                <div style="display: flex; gap: 8px; flex-shrink: 0;">
+                    ${canComplete ? `
+                        <button class="complete-all-btn" onclick="completeAllInGroup('${group.docNo}', '${group.title}')" 
+                                style="
+                                    background: #10b981; 
+                                    color: white; 
+                                    border: none; 
+                                    padding: 8px 16px; 
+                                    border-radius: 8px; 
+                                    cursor: pointer; 
+                                    font-size: 0.85rem; 
+                                    font-weight: 600;
+                                    transition: all 0.2s ease;
+                                    display: flex;
+                                    align-items: center;
+                                    gap: 6px;
+                                ">
+                            ✓ Complete All
+                        </button>
+                    ` : `
+                        <span style="
+                            padding: 8px 16px; 
+                            background: ${group.status === 'completed' ? '#dcfce7' : '#dbeafe'}; 
+                            color: ${group.status === 'completed' ? '#166534' : '#1e40af'}; 
+                            border-radius: 8px; 
+                            font-size: 0.85rem; 
+                            font-weight: 600;
+                        ">
+                            ${group.status.replace('_', ' ').toUpperCase()}
+                        </span>
+                    `}
+                    
+                    <button class="expand-btn" style="
+                        background: #3b82f6; 
+                        color: white; 
+                        border: none; 
+                        padding: 8px 12px; 
+                        border-radius: 8px; 
+                        cursor: pointer; 
+                        font-size: 0.85rem;
+                        font-weight: 600;
+                        transition: all 0.2s ease;
+                        display: flex;
+                        align-items: center;
+                        gap: 6px;
+                    ">
+                        👁️ View Items
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Expandable Task Details -->
+            <div class="group-tasks" style="display: none; border-top: 2px solid #f1f5f9; padding-top: 16px;">
+                <div style="display: grid; gap: 10px;">
+                    ${group.tasks.map((task, index) => `
+                        <div class="task-item" style="
+                            display: flex; 
+                            justify-content: space-between; 
+                            align-items: center; 
+                            padding: 12px; 
+                            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); 
+                            border-radius: 8px; 
+                            border-left: 3px solid ${getPriorityColor(task.priority)};
+                            transition: all 0.2s ease;
+                        " onmouseover="this.style.background='linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%)'"
+                           onmouseout="this.style.background='linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)'">
+                            <div style="flex: 1;">
+                                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+                                    <strong style="color: #1e293b; font-size: 0.9rem;">
+                                        ${task.jobDetails.itemCode}
+                                    </strong>
+                                    <span style="color: #64748b; font-size: 0.8rem;">•</span>
+                                    <span style="color: #475569; font-size: 0.85rem; font-weight: 500;">
+                                        ${task.jobDetails.customerName}
+                                    </span>
+                                </div>
+                                <div style="color: #64748b; font-size: 0.8rem; line-height: 1.4; margin-bottom: 4px;">
+                                    ${task.jobDetails.description}
+                                </div>
+                                <div style="font-size: 0.75rem; color: #64748b;">
+                                    Qty: <strong>${task.jobDetails.qty}</strong>
+                                </div>
+                            </div>
+                            <div style="display: flex; gap: 6px; align-items: center;">
+                                ${task.status === 'pending' ? `
+                                    <button class="btn-small btn-success" onclick="completeTask('${task._id}')" 
+                                            style="padding: 6px 12px; font-size: 0.75rem; border-radius: 6px;">
+                                        ✓ Complete
+                                    </button>
+                                ` : `
+                                    <span style="
+                                        padding: 4px 10px; 
+                                        background: ${task.status === 'completed' ? '#dcfce7' : '#dbeafe'}; 
+                                        color: ${task.status === 'completed' ? '#166534' : '#1e40af'}; 
+                                        border-radius: 6px; 
+                                        font-size: 0.7rem; 
+                                        font-weight: 600;
+                                    ">
+                                        ${task.status.replace('_', ' ').toUpperCase()}
+                                    </span>
+                                `}
+                                <button class="btn-small btn-primary" onclick="viewTaskDetails('${task._id}')" 
+                                        style="padding: 6px 10px; font-size: 0.75rem; border-radius: 6px;">
+                                    👁️
+                                </button>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+
+            // Add click handlers
+            const expandBtn = groupCard.querySelector('.expand-btn');
+            const tasksDiv = groupCard.querySelector('.group-tasks');
+
+            expandBtn.addEventListener('click', function () {
+                const isHidden = tasksDiv.style.display === 'none';
+                tasksDiv.style.display = isHidden ? 'block' : 'none';
+                expandBtn.innerHTML = isHidden ? '👁️ Hide Items' : '👁️ View Items';
+                expandBtn.style.background = isHidden ? '#6b7280' : '#3b82f6';
+            });
+
+            container.appendChild(groupCard);
+        });
+    }
+
+
     function groupTasksByJob(tasks) {
         const groups = {};
         tasks.forEach(task => {
-            if (task.docNo && task.customerName) {
-                const key = `${task.docNo} - ${task.customerName} - ${task.currentStage}`;
+            if (task.jobDetails && task.jobDetails.docNo) {
+                // Group by TITLE (stage) + DOC NUMBER only
+                const key = `${task.title}-${task.jobDetails.docNo}`;
                 if (!groups[key]) {
                     groups[key] = {
-                        docNo: task.docNo,
-                        customerName: task.customerName,
-                        currentStage: task.currentStage,
+                        title: task.title, // The task title (stage description)
+                        docNo: task.jobDetails.docNo,
+                        customerName: task.jobDetails.customerName,
+                        currentStage: task.jobDetails.currentStage,
+                        priority: task.priority,
+                        dueDate: task.dueDate,
+                        status: task.status,
                         tasks: []
                     };
                 }
@@ -359,51 +678,6 @@ document.addEventListener('DOMContentLoaded', function () {
         return groups;
     }
 
-    function renderGroupedTasks(container, groups) {
-        Object.values(groups).forEach(group => {
-            const groupCard = document.createElement('div');
-            groupCard.className = 'task-group-card';
-            groupCard.style.cssText = `
-                background: white;
-            border - radius: 12px;
-            padding: 20px;
-            margin - bottom: 20px;
-            box - shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
-            cursor: pointer;
-            transition: transform 0.2s;
-            `;
-
-            groupCard.innerHTML = `
-                <div style = "display: flex; justify-content: space-between; align-items: center;" >
-                    <div>
-                        <h4 style="color: #1e293b; margin-bottom: 5px;">${group.docNo} - ${group.customerName}</h4>
-                        <p style="color: #64748b;">Stage: ${group.currentStage} | ${group.tasks.length} tasks</p>
-                    </div>
-                    <span style="color: #667eea; font-weight: 600;">Click to expand</span>
-                </div >
-                <div class="group-tasks" style="display: none; margin-top: 20px; border-top: 1px solid #e5e7eb; padding-top: 20px;">
-                    ${group.tasks.map(task => `
-                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; background: #f8fafc; border-radius: 6px; margin-bottom: 10px;">
-                            <div>
-                                <strong>${task.itemCode}</strong> - ${task.description}
-                                <br><small>Qty: ${task.qty}</small>
-                            </div>
-                            <button class="btn-small btn-success" onclick="completeTask(${task.id})">Complete</button>
-                        </div>
-                    `).join('')}
-                </div>
-            `;
-
-            groupCard.addEventListener('click', function (e) {
-                if (e.target.tagName !== 'BUTTON') {
-                    const tasksDiv = this.querySelector('.group-tasks');
-                    tasksDiv.style.display = tasksDiv.style.display === 'none' ? 'block' : 'none';
-                }
-            });
-
-            container.appendChild(groupCard);
-        });
-    }
 
     // In user.js - Update createTaskCard to show job description for job-auto tasks
 
@@ -420,55 +694,101 @@ document.addEventListener('DOMContentLoaded', function () {
             task.assignedTo.map(user => user.username || 'Unknown').join(', ') :
             (task.assignedTo?.username || 'Unknown');
 
-        // Show job description prominently for job-auto tasks
-        const jobDescription = task.type === 'job-auto' && task.jobDetails?.description ? `
-        <div style="background: #eff6ff; padding: 12px; border-radius: 6px; margin: 10px 0; border-left: 4px solid #3b82f6;">
-            <div style="font-weight: 600; color: #1e40af; margin-bottom: 6px; font-size: 0.9rem;">
-                📋 Job Description:
+        // UPDATED: Show client name in job description for job-auto tasks
+        const jobDescription = task.type === 'job-auto' && task.jobDetails ? `
+        <div style="background: #eff6ff; padding: 10px; border-radius: 6px; margin: 8px 0; border-left: 3px solid #3b82f6;">
+            <div style="font-weight: 600; color: #1e40af; margin-bottom: 4px; font-size: 0.85rem;">
+                📋 ${task.jobDetails.customerName} - ${task.jobDetails.itemCode}
             </div>
-            <div style="color: #1e40af; font-size: 0.85rem; line-height: 1.4;">
+            <div style="color: #1e40af; font-size: 0.8rem; line-height: 1.3; margin-bottom: 4px;">
                 ${task.jobDetails.description}
             </div>
-            <div style="margin-top: 6px; font-size: 0.75rem; color: #64748b;">
-                Doc: ${task.jobDetails.docNo} | Item: ${task.jobDetails.itemCode} | Qty: ${task.jobDetails.qty}
+            <div style="font-size: 0.7rem; color: #64748b;">
+                Doc: ${task.jobDetails.docNo} | Qty: ${task.jobDetails.qty} | Stage: ${task.jobDetails.currentStage || 'N/A'}
             </div>
         </div>
     ` : '';
 
         // Show completion status for multi-assignee tasks
         const currentUser = getCurrentUser();
-        const multiAssigneeStatus = task.assignedTo.length > 1 ? `
-        <div style="background: #f8fafc; padding: 6px 8px; border-radius: 4px; margin: 6px 0; font-size: 0.75rem; color: #64748b;">
-            👥 Multi-assignee task: ${task.individualCompletions?.length || 0}/${task.assignedTo.length} completed
+        const multiAssigneeStatus = Array.isArray(task.assignedTo) && task.assignedTo.length > 1 ? `
+        <div style="background: #f8fafc; padding: 4px 6px; border-radius: 4px; margin: 4px 0; font-size: 0.7rem; color: #64748b;">
+            👥 Multi-assignee: ${task.individualCompletions?.length || 0}/${task.assignedTo.length} completed
             ${task.individualCompletions?.some(comp => comp.userId === currentUser?.id) ? ' (✅ You completed)' : ''}
         </div>
     ` : '';
 
+        // REDUCED card height and padding
+        card.style.cssText = `
+        background: white;
+        border-radius: 8px;
+        padding: 12px; /* Reduced from 16px */
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06);
+        border: 1px solid #e5e7eb;
+        border-left: 3px solid var(--priority-color-${task.priority});
+        transition: all 0.2s ease;
+        margin-bottom: 10px; /* Reduced from 15px */
+        min-height: auto; /* Remove fixed height */
+    `;
+
+        // Define priority colors
+        const priorityColors = {
+            'low': '#10b981',
+            'medium': '#f59e0b',
+            'high': '#ef4444',
+            'urgent': '#dc2626'
+        };
+
+        // Set CSS custom property for border color
+        card.style.setProperty('border-left-color', priorityColors[task.priority] || '#64748b');
+
         card.innerHTML = `
-        <div class="task-header">
-            <div>
-                <div class="task-title">${task.title}</div>
-                <div class="task-meta">
-                    Type: ${task.type.toUpperCase()} | Priority: ${task.priority.toUpperCase()}
-                    ${task.type === 'job-auto' ? `| Stage: ${task.jobDetails?.currentStage || 'N/A'}` : ''}
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; gap: 8px;">
+            <div style="flex: 1; min-width: 0;">
+                <h4 style="color: #1e293b; margin: 0 0 4px 0; font-size: 0.95rem; font-weight: 600; line-height: 1.3; overflow: hidden; text-overflow: ellipsis;">
+                    ${task.title}
+                </h4>
+                <div style="font-size: 0.7rem; color: #64748b; display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                    <span>${task.type.toUpperCase()}</span>
+                    <span style="color: ${priorityColors[task.priority]}; font-weight: 600;">${task.priority.toUpperCase()}</span>
                 </div>
             </div>
-            <span class="task-status ${isOverdue ? 'status-overdue' : 'status-' + task.status}">
-                ${isOverdue ? 'Overdue' : task.status.replace('_', ' ').toUpperCase()}
+            <span style="
+                padding: 2px 6px; 
+                border-radius: 10px; 
+                font-size: 0.65rem; 
+                font-weight: 600;
+                background: ${isOverdue ? '#fee2e2' : task.status === 'completed' ? '#dcfce7' : task.status === 'pending_approval' ? '#dbeafe' : '#fef3c7'};
+                color: ${isOverdue ? '#991b1b' : task.status === 'completed' ? '#166534' : task.status === 'pending_approval' ? '#1e40af' : '#92400e'};
+                white-space: nowrap;
+            ">
+                ${isOverdue ? '⚠️ OVERDUE' : task.status.replace('_', ' ').toUpperCase()}
             </span>
         </div>
-        
-        <div class="task-description">${task.description}</div>
-        
+
+        <!-- COMPACT Description -->
+        <div style="color: #475569; margin-bottom: 8px; font-size: 0.8rem; line-height: 1.3; 
+                    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+            ${task.description}
+        </div>
+
         ${jobDescription}
         ${multiAssigneeStatus}
-        
-        <div class="task-footer">
-            <small>Due: ${dueDate.toLocaleDateString()}</small>
-            <div class="task-actions">
+
+        <!-- COMPACT Footer -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px; padding-top: 8px; border-top: 1px solid #f1f5f9;">
+            <div style="font-size: 0.7rem; color: #64748b;">
+                📅 ${dueDate.toLocaleDateString()}
+                ${isOverdue ? ' <span style="color: #ef4444; font-weight: 600;">⚠️</span>' : ''}
+            </div>
+            <div style="display: flex; gap: 3px;">
                 ${task.status === 'pending' && !task.individualCompletions?.some(comp => comp.userId === currentUser?.id) ?
-                `<button class="btn-small btn-success" onclick="completeTask('${task._id}')">Complete</button>` : ''}
-                <button class="btn-small btn-primary" onclick="viewTaskDetails('${task._id}')">Details</button>
+                `<button class="btn-small btn-success" onclick="completeTask('${task._id}')" style="padding: 3px 8px; font-size: 0.7rem; border-radius: 4px;">
+                    ✓ Complete
+                </button>` : ''}
+                <button class="btn-small btn-primary" onclick="viewTaskDetails('${task._id}')" style="padding: 3px 8px; font-size: 0.7rem; border-radius: 4px;">
+                    👁️
+                </button>
             </div>
         </div>
     `;
@@ -476,13 +796,80 @@ document.addEventListener('DOMContentLoaded', function () {
         return card;
     }
 
+    function updateTasksGridStyles() {
+        const style = document.createElement('style');
+        style.textContent = `
+        .tasks-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); /* Smaller min-width */
+            gap: 12px; /* Reduced gap */
+            max-width: 100%;
+        }
+
+        .task-card {
+            background: white;
+            border-radius: 8px;
+            padding: 12px; /* Reduced padding */
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06);
+            border: 1px solid #e5e7eb;
+            transition: all 0.2s ease;
+            position: relative;
+            overflow: hidden;
+            min-height: auto; /* Remove fixed height constraints */
+        }
+
+        .task-card:hover {
+            transform: translateY(-2px); /* Reduced hover effect */
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .btn-small {
+            padding: 3px 8px;
+            font-size: 0.7rem;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-weight: 500;
+        }
+
+        .btn-small.btn-success {
+            background: #10b981;
+            color: white;
+        }
+
+        .btn-small.btn-primary {
+            background: #3b82f6;
+            color: white;
+        }
+
+        .btn-small:hover {
+            transform: scale(1.05);
+            opacity: 0.9;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .tasks-grid {
+                grid-template-columns: 1fr;
+                gap: 8px;
+            }
+            
+            .task-card {
+                padding: 10px;
+            }
+        }
+    `;
+        document.head.appendChild(style);
+    }
+
+
     // Add function to get current user
     function getCurrentUser() {
         const userInfo = localStorage.getItem('atpl_user_info');
         return userInfo ? JSON.parse(userInfo) : null;
     }
 
-    // Fix 2: Update renderGroupedTasks function in user.js
     function renderGroupedTasks(container, groups) {
         Object.values(groups).forEach(group => {
             const groupCard = document.createElement('div');
@@ -500,19 +887,39 @@ document.addEventListener('DOMContentLoaded', function () {
             groupCard.innerHTML = `
             <div style="display: flex; justify-content: space-between; align-items: center;">
                 <div>
-                    <h4 style="color: #1e293b; margin-bottom: 5px;">${group.docNo} - ${group.customerName}</h4>
-                    <p style="color: #64748b;">Stage: ${group.currentStage} | ${group.tasks.length} tasks</p>
+                    <h4 style="color: #1e293b; margin-bottom: 5px;">${group.title}</h4>
+                    <p style="color: #64748b;">Doc: ${group.docNo} | Customer: ${group.customerName} | ${group.tasks.length} items</p>
                 </div>
                 <span style="color: #667eea; font-weight: 600;">Click to expand</span>
             </div>
             <div class="group-tasks" style="display: none; margin-top: 20px; border-top: 1px solid #e5e7eb; padding-top: 20px;">
                 ${group.tasks.map(task => `
-                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; background: #f8fafc; border-radius: 6px; margin-bottom: 10px;">
-                        <div>
-                            <strong>${task.itemCode}</strong> - ${task.description}
-                            <br><small>Qty: ${task.qty}</small>
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #f8fafc; border-radius: 6px; margin-bottom: 10px; border-left: 3px solid #3b82f6;">
+                        <div style="flex: 1;">
+                            <div style="font-weight: 600; color: #1e293b; margin-bottom: 4px;">
+                                ${task.jobDetails.itemCode} - ${task.jobDetails.customerName}
+                            </div>
+                            <div style="color: #64748b; font-size: 0.9rem; margin-bottom: 4px;">
+                                ${task.jobDetails.description}
+                            </div>
+                            <div style="font-size: 0.8rem; color: #64748b;">
+                                Qty: ${task.jobDetails.qty} | Due: ${new Date(task.dueDate).toLocaleDateString()}
+                            </div>
                         </div>
-                        <button class="btn-small btn-success" onclick="completeTask('${task._id}')">Complete</button>
+                        <div style="display: flex; gap: 8px;">
+                            ${task.status === 'pending' ? `
+                                <button class="btn-small btn-success" onclick="completeTask('${task._id}')" style="padding: 6px 12px; font-size: 0.8rem;">
+                                    Complete
+                                </button>
+                            ` : `
+                                <span style="padding: 4px 8px; background: #dcfce7; color: #166534; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">
+                                    ${task.status.toUpperCase()}
+                                </span>
+                            `}
+                            <button class="btn-small btn-primary" onclick="viewTaskDetails('${task._id}')" style="padding: 6px 12px; font-size: 0.8rem;">
+                                Details
+                            </button>
+                        </div>
                     </div>
                 `).join('')}
             </div>
@@ -1099,6 +1506,82 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         document.getElementById(modalId).style.display = 'block';
     }
+
+    window.completeAllInGroup = async function (docNo, title) {
+        const tasksInGroup = tasks.filter(task =>
+            task.jobDetails &&
+            task.jobDetails.docNo === docNo &&
+            task.title === title &&
+            task.status === 'pending'
+        );
+
+        if (tasksInGroup.length === 0) {
+            showMessage('No pending tasks found in this group', 'info');
+            return;
+        }
+
+        const confirmMessage = `Are you sure you want to complete all ${tasksInGroup.length} tasks in this group?\n\nDoc: ${docNo}\nTask: ${title}`;
+
+        if (!confirm(confirmMessage)) {
+            return;
+        }
+
+        // Show loading state
+        const completeBtn = document.querySelector(`button[onclick="completeAllInGroup('${docNo}', '${title}')"]`);
+        if (completeBtn) {
+            completeBtn.innerHTML = '⏳ Completing...';
+            completeBtn.disabled = true;
+        }
+
+        let successCount = 0;
+        let errorCount = 0;
+
+        // Complete each task individually
+        for (const task of tasksInGroup) {
+            try {
+                const response = await fetch(`${API_URL}/tasks/${task._id}/complete`, {
+                    method: 'POST',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify({
+                        remarks: `Bulk completion for ${docNo} - ${title}`,
+                        attachments: []
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    successCount++;
+                } else {
+                    errorCount++;
+                    console.error('Failed to complete task:', task._id, result.error);
+                }
+            } catch (error) {
+                errorCount++;
+                console.error('Error completing task:', task._id, error);
+            }
+        }
+
+        // Show results and reload
+        if (successCount > 0) {
+            showMessage(`Successfully completed ${successCount} tasks${errorCount > 0 ? `, ${errorCount} failed` : ''}`,
+                errorCount > 0 ? 'warning' : 'success');
+
+            // Reload tasks to update UI
+            await loadTasks();
+
+            // Refresh the current section
+            loadSectionData('job-entry');
+        } else {
+            showMessage('Failed to complete any tasks', 'error');
+
+            // Re-enable button
+            if (completeBtn) {
+                completeBtn.innerHTML = '✓ Complete All';
+                completeBtn.disabled = false;
+            }
+        }
+    };
 
     window.closeModal = function (modalId) {
         document.getElementById(modalId).style.display = 'none';

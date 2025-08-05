@@ -4,11 +4,15 @@ document.addEventListener('DOMContentLoaded', function () {
     let users = [];
     let jobs = [];
     let tasks = [];
+    let filteredTasks = [];
+    let filteredJobs = [];
     const API_URL = 'https://atpl-daily-task-management.onrender.com/api';
     // const API_URL = 'http://localhost:3000/api';
 
     // Check authentication
     checkAuth();
+
+
 
     // Navigation
     const navButtons = document.querySelectorAll('.nav-btn');
@@ -44,6 +48,75 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
     });
+
+    setTimeout(() => {
+        const applyFiltersBtn = document.getElementById('applyFilters');
+        const clearFiltersBtn = document.getElementById('clearFilters');
+
+        if (applyFiltersBtn) {
+            applyFiltersBtn.addEventListener('click', applyTaskFilters);
+        }
+
+        if (clearFiltersBtn) {
+            clearFiltersBtn.addEventListener('click', clearAllFilters);
+        }
+
+        // Add auto-filter on input change
+        const filterInputs = ['taskSearch', 'userFilter', 'statusFilter', 'typeFilter', 'priorityFilter', 'departmentFilter'];
+        filterInputs.forEach(id => {
+            const element = document.getElementById(id);
+            if (element) {
+                element.addEventListener('change', applyTaskFilters);
+                if (element.type === 'text') {
+                    element.addEventListener('input', debounce(applyTaskFilters, 300));
+                }
+            }
+        });
+    }, 100);
+
+    setTimeout(() => {
+        // Job filter event listeners
+        const applyJobFiltersBtn = document.getElementById('applyJobFilters');
+        const clearJobFiltersBtn = document.getElementById('clearJobFilters');
+
+        if (applyJobFiltersBtn) {
+            applyJobFiltersBtn.addEventListener('click', applyJobFilters);
+        }
+
+        if (clearJobFiltersBtn) {
+            clearJobFiltersBtn.addEventListener('click', clearJobFilters);
+        }
+
+        // Add auto-filter on input change for jobs
+        const jobFilterInputs = [
+            'docNoFilter', 'customerFilter', 'itemCodeFilter', 'descriptionFilter',
+            'qtyFilter', 'monthFilter', 'weekFilter', 'statusJobFilter', 'dueDateFilter'
+        ];
+
+        jobFilterInputs.forEach(id => {
+            const element = document.getElementById(id);
+            if (element) {
+                if (element.type === 'text' || element.type === 'number') {
+                    element.addEventListener('input', debounce(applyJobFilters, 300));
+                } else {
+                    element.addEventListener('change', applyJobFilters);
+                }
+            }
+        });
+    }, 100);
+
+
+    function debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    }
 
     document.querySelectorAll('.close').forEach(btn => {
         btn.addEventListener('click', function () {
@@ -162,6 +235,171 @@ document.addEventListener('DOMContentLoaded', function () {
         };
     }
 
+    function populateFilterDropdowns() {
+        // Populate user dropdown
+        const userFilter = document.getElementById('userFilter');
+        if (userFilter && users.length > 0) {
+            userFilter.innerHTML = '<option value="">All Users</option>';
+            const userOptions = [...new Set(users.map(u => u.username))];
+            userOptions.forEach(username => {
+                const option = document.createElement('option');
+                option.value = username;
+                option.textContent = username;
+                userFilter.appendChild(option);
+            });
+        }
+    }
+
+    function calculateJobDueDate(job) {
+        // Calculate due date based on status and creation date
+        const createdDate = new Date(job.createdAt || Date.now());
+        const statusDays = {
+            'sales order received': 7,
+            'drawing approved': 14,
+            'long lead item detail given': 10,
+            'drawing/bom issued': 7,
+            'production order and purchase request prepared': 5,
+            'rm received': 21,
+            'production started': 14,
+            'production completed': 7,
+            'qc clear for dispatch': 3,
+            'dispatch clearance': 2,
+            'completed': 0,
+            'hold': 3,
+            'hold cleared': 7,
+            'so cancelled': 0
+        };
+
+        const daysToAdd = statusDays[job.status] || 7;
+        const dueDate = new Date(createdDate);
+        dueDate.setDate(dueDate.getDate() + daysToAdd);
+
+        return dueDate;
+    }
+
+    function applyTaskFilters() {
+        const searchTerm = document.getElementById('taskSearch')?.value.toLowerCase() || '';
+        const userFilter = document.getElementById('userFilter')?.value || '';
+        const statusFilter = document.getElementById('statusFilter')?.value || '';
+        const typeFilter = document.getElementById('typeFilter')?.value || '';
+        const priorityFilter = document.getElementById('priorityFilter')?.value || '';
+        const departmentFilter = document.getElementById('departmentFilter')?.value || '';
+
+        filteredTasks = tasks.filter(task => {
+            // Search filter
+            if (searchTerm && !task.title.toLowerCase().includes(searchTerm) &&
+                !task.description.toLowerCase().includes(searchTerm) &&
+                !(task.docNo && task.docNo.toLowerCase().includes(searchTerm)) &&
+                !(task.customerName && task.customerName.toLowerCase().includes(searchTerm))) {
+                return false;
+            }
+
+            // User filter
+            if (userFilter) {
+                const assignedUsernames = Array.isArray(task.assignedTo)
+                    ? task.assignedTo.map(user => user?.username || '').filter(Boolean)
+                    : [task.assignedTo?.username || ''];
+                if (!assignedUsernames.includes(userFilter)) {
+                    return false;
+                }
+            }
+
+            // Status filter
+            if (statusFilter && task.status !== statusFilter) {
+                return false;
+            }
+
+            // Type filter
+            if (typeFilter && task.type !== typeFilter) {
+                return false;
+            }
+
+            // Priority filter
+            if (priorityFilter && task.priority !== priorityFilter) {
+                return false;
+            }
+
+            // Department filter
+            if (departmentFilter) {
+                const assignedDepartments = Array.isArray(task.assignedTo)
+                    ? task.assignedTo.map(user => user?.department || '').filter(Boolean)
+                    : [task.assignedTo?.department || ''];
+                if (!assignedDepartments.includes(departmentFilter)) {
+                    return false;
+                }
+            }
+
+            return true;
+        });
+
+        renderFilteredTasks();
+        updateFilterResultsInfo();
+    }
+
+    function renderFilteredTasks() {
+        const container = document.getElementById('tasksContainer');
+        container.innerHTML = '';
+
+        if (filteredTasks.length === 0) {
+            container.innerHTML = '<p style="text-align: center; color: #64748b; padding: 40px;">No tasks match the current filters</p>';
+            return;
+        }
+
+        // Sort tasks by status priority
+        const sortedTasks = [...filteredTasks].sort((a, b) => {
+            const statusOrder = {
+                'pending_approval': 0,
+                'pending': 1,
+                'completed': 2,
+                'rejected': 3
+            };
+            return statusOrder[a.status] - statusOrder[b.status];
+        });
+
+        // Create grid container
+        const gridContainer = document.createElement('div');
+        gridContainer.style.cssText = `
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+        gap: 16px;
+        margin-top: 15px;
+    `;
+
+        sortedTasks.forEach(task => {
+            gridContainer.appendChild(createTaskCard(task));
+        });
+
+        container.appendChild(gridContainer);
+    }
+
+    function updateFilterResultsInfo() {
+        const resultInfo = document.getElementById('filterResultsInfo');
+        if (resultInfo) {
+            const totalTasks = tasks.length;
+            const filteredCount = filteredTasks.length;
+
+            resultInfo.textContent = `Showing ${filteredCount} of ${totalTasks} tasks`;
+            resultInfo.style.display = 'block';
+        }
+    }
+
+    function clearAllFilters() {
+        document.getElementById('taskSearch').value = '';
+        document.getElementById('userFilter').value = '';
+        document.getElementById('statusFilter').value = '';
+        document.getElementById('typeFilter').value = '';
+        document.getElementById('priorityFilter').value = '';
+        document.getElementById('departmentFilter').value = '';
+
+        filteredTasks = [...tasks];
+        renderFilteredTasks();
+
+        const resultInfo = document.getElementById('filterResultsInfo');
+        if (resultInfo) {
+            resultInfo.style.display = 'none';
+        }
+    }
+
     async function loadUsers() {
         try {
             const response = await fetch(`${API_URL}/users`, {
@@ -181,6 +419,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 headers: getAuthHeaders()
             });
             jobs = await response.json();
+
+            // Initialize filtered jobs
+            filteredJobs = [];
+
             renderJobsTable();
         } catch (error) {
             showMessage('Error loading jobs', 'error');
@@ -196,7 +438,6 @@ document.addEventListener('DOMContentLoaded', function () {
             if (response.ok) {
                 tasks = await response.json();
             } else if (response.status === 404 || response.status === 403) {
-                // Fall back to regular tasks endpoint
                 const fallbackResponse = await fetch(`${API_URL}/tasks`, {
                     headers: getAuthHeaders()
                 });
@@ -209,16 +450,24 @@ document.addEventListener('DOMContentLoaded', function () {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
 
-            // Ensure tasks is always an array
             if (!Array.isArray(tasks)) {
                 tasks = [];
             }
 
-            renderTasksContainer();
+            // Initialize filtered tasks
+            filteredTasks = [...tasks];
+
+            // Populate filter dropdowns
+            populateFilterDropdowns();
+
+            // Render tasks
+            renderFilteredTasks();
+
         } catch (error) {
             console.error('Error loading tasks:', error);
-            tasks = []; // Ensure tasks is an empty array on error
-            renderTasksContainer(); // Still render to show "no tasks" message
+            tasks = [];
+            filteredTasks = [];
+            renderFilteredTasks();
             showMessage('Error loading tasks', 'error');
         }
     }
@@ -257,24 +506,67 @@ document.addEventListener('DOMContentLoaded', function () {
         const tbody = document.querySelector('#jobsTable tbody');
         tbody.innerHTML = '';
 
-        jobs.forEach(job => {
+        // Use filtered jobs or all jobs
+        const jobsToRender = filteredJobs.length > 0 || isFilterActive() ? filteredJobs : jobs;
+
+        if (jobsToRender.length === 0) {
             const row = document.createElement('tr');
             row.innerHTML = `
-                <td>${job.docNo}</td>
-                <td>${job.customerName}</td>
-                <td>${job.itemCode}</td>
-                <td>${job.description}</td>
-                <td>${job.qty}</td>
-                <td>${job.month}</td>
-                <td>${job.week}</td>
-                <td><span class="task-status status-pending">${job.status}</span></td>
-                <td>
-                    <button class="btn-small btn-primary" onclick="editJob('${job._id}')">Edit</button>
-                    <button class="btn-small btn-warning" onclick="viewJobTasks('${job._id}')">Tasks</button>
-                </td>
-            `;
+            <td colspan="10" style="text-align: center; padding: 2rem; color: #64748b;">
+                ${isFilterActive() ? 'No jobs match the current filters' : 'No jobs found'}
+            </td>
+        `;
+            tbody.appendChild(row);
+            return;
+        }
+
+        jobsToRender.forEach(job => {
+            const row = document.createElement('tr');
+            const dueDate = calculateJobDueDate(job);
+            const isOverdue = new Date() > dueDate && job.status !== 'completed' && job.status !== 'so cancelled';
+
+            // Status color coding
+            const getStatusClass = (status) => {
+                if (status === 'completed') return 'status-completed';
+                if (status === 'so cancelled') return 'status-rejected';
+                if (status === 'hold') return 'status-overdue';
+                if (isOverdue) return 'status-overdue';
+                return 'status-pending';
+            };
+
+            row.innerHTML = `
+            <td><strong>${job.docNo}</strong></td>
+            <td>${job.customerName}</td>
+            <td><code>${job.itemCode}</code></td>
+            <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis;" title="${job.description}">
+                ${job.description}
+            </td>
+            <td style="text-align: center;"><strong>${job.qty}</strong></td>
+            <td>${job.month}</td>
+            <td>${job.week}</td>
+            <td>
+                <span class="task-status ${getStatusClass(job.status)}">
+                    ${job.status.toUpperCase()}
+                </span>
+            </td>
+            <td style="color: ${isOverdue ? '#ef4444' : '#64748b'};">
+                ${dueDate.toLocaleDateString()}
+                ${isOverdue ? '<br><small style="color: #ef4444;">⚠️ Overdue</small>' : ''}
+            </td>
+            <td>
+                <button class="btn-small btn-primary" onclick="editJob('${job._id}')" title="Edit Job">
+                    <i class="fas fa-edit"></i>
+                </button>
+                <button class="btn-small btn-warning" onclick="viewJobTasks('${job._id}')" title="View Tasks">
+                    <i class="fas fa-tasks"></i>
+                </button>
+            </td>
+        `;
             tbody.appendChild(row);
         });
+
+        // Update results info
+        updateJobFilterResults();
     }
 
     // FIXED: Render all tasks as individual cards in a grid
@@ -367,6 +659,118 @@ document.addEventListener('DOMContentLoaded', function () {
         container.insertBefore(statsContainer, gridContainer);
     }
 
+    function isFilterActive() {
+        const filters = [
+            'docNoFilter', 'customerFilter', 'itemCodeFilter', 'descriptionFilter',
+            'qtyFilter', 'monthFilter', 'weekFilter', 'statusJobFilter', 'dueDateFilter'
+        ];
+
+        return filters.some(filterId => {
+            const element = document.getElementById(filterId);
+            return element && element.value.trim() !== '';
+        });
+    }
+
+    function applyJobFilters() {
+        const filters = {
+            docNo: document.getElementById('docNoFilter')?.value.toLowerCase().trim() || '',
+            customer: document.getElementById('customerFilter')?.value.toLowerCase().trim() || '',
+            itemCode: document.getElementById('itemCodeFilter')?.value.toLowerCase().trim() || '',
+            description: document.getElementById('descriptionFilter')?.value.toLowerCase().trim() || '',
+            qty: document.getElementById('qtyFilter')?.value || '',
+            month: document.getElementById('monthFilter')?.value.toLowerCase().trim() || '',
+            week: document.getElementById('weekFilter')?.value.toLowerCase().trim() || '',
+            status: document.getElementById('statusJobFilter')?.value || '',
+            dueDate: document.getElementById('dueDateFilter')?.value || ''
+        };
+
+        filteredJobs = jobs.filter(job => {
+            // Doc No filter
+            if (filters.docNo && !job.docNo.toLowerCase().includes(filters.docNo)) {
+                return false;
+            }
+
+            // Customer filter
+            if (filters.customer && !job.customerName.toLowerCase().includes(filters.customer)) {
+                return false;
+            }
+
+            // Item Code filter
+            if (filters.itemCode && !job.itemCode.toLowerCase().includes(filters.itemCode)) {
+                return false;
+            }
+
+            // Description filter
+            if (filters.description && !job.description.toLowerCase().includes(filters.description)) {
+                return false;
+            }
+
+            // Quantity filter (minimum quantity)
+            if (filters.qty && job.qty < parseInt(filters.qty)) {
+                return false;
+            }
+
+            // Month filter
+            if (filters.month && !job.month.toLowerCase().includes(filters.month)) {
+                return false;
+            }
+
+            // Week filter
+            if (filters.week && !job.week.toLowerCase().includes(filters.week)) {
+                return false;
+            }
+
+            // Status filter
+            if (filters.status && job.status !== filters.status) {
+                return false;
+            }
+
+            // Due Date filter
+            if (filters.dueDate) {
+                const jobDueDate = calculateJobDueDate(job);
+                const filterDate = new Date(filters.dueDate);
+                if (jobDueDate.toDateString() !== filterDate.toDateString()) {
+                    return false;
+                }
+            }
+
+            return true;
+        });
+
+        renderJobsTable();
+    }
+
+    function clearJobFilters() {
+        const filterIds = [
+            'docNoFilter', 'customerFilter', 'itemCodeFilter', 'descriptionFilter',
+            'qtyFilter', 'monthFilter', 'weekFilter', 'statusJobFilter', 'dueDateFilter'
+        ];
+
+        filterIds.forEach(id => {
+            const element = document.getElementById(id);
+            if (element) {
+                element.value = '';
+            }
+        });
+
+        filteredJobs = [];
+        renderJobsTable();
+    }
+
+    function updateJobFilterResults() {
+        const resultElement = document.getElementById('jobFilterResults');
+        if (resultElement) {
+            if (isFilterActive()) {
+                const total = jobs.length;
+                const filtered = filteredJobs.length;
+                resultElement.textContent = `Showing ${filtered} of ${total} jobs`;
+            } else {
+                resultElement.textContent = `Total: ${jobs.length} jobs`;
+            }
+        }
+    }
+
+
     // OPTIMIZED: Compact task card creation with better space utilization
     function createTaskCard(task) {
         const card = document.createElement('div');
@@ -375,9 +779,26 @@ document.addEventListener('DOMContentLoaded', function () {
         const today = new Date();
         const isOverdue = (task.status === 'pending' || task.status === 'pending_approval') && dueDate < today;
 
-        // Handle populated user objects from MongoDB
-        const assignedUserName = task.assignedTo?.username || 'Unknown';
-        const assignedUserDept = task.assignedTo?.department || 'Unknown';
+        // FIXED: Handle populated user objects from MongoDB properly
+        let assignedUserName = 'Unknown';
+        let assignedUserDept = 'Unknown';
+
+        if (task.assignedTo) {
+            if (Array.isArray(task.assignedTo)) {
+                // Multiple assignees
+                assignedUserName = task.assignedTo
+                    .map(user => user?.username || 'Unknown')
+                    .join(', ');
+                assignedUserDept = task.assignedTo
+                    .map(user => user?.department || 'Unknown')
+                    .join(', ');
+            } else {
+                // Single assignee
+                assignedUserName = task.assignedTo.username || 'Unknown';
+                assignedUserDept = task.assignedTo.department || 'Unknown';
+            }
+        }
+
         const assignedByUserName = task.assignedBy?.username || 'System';
 
         // Priority colors
@@ -400,14 +821,15 @@ document.addEventListener('DOMContentLoaded', function () {
         const statusColor = statusColors[task.status] || '#64748b';
 
         card.style.cssText = `
-            background: white;
-            border-radius: 8px;
-            padding: 16px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
-            border-left: 3px solid ${priorityColor};
-            transition: transform 0.2s, box-shadow 0.2s;
-            position: relative;
-        `;
+        background: white;
+        border-radius: 8px;
+        padding: 16px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+        border-left: 3px solid ${priorityColor};
+        transition: transform 0.2s, box-shadow 0.2s;
+        position: relative;
+        margin-bottom: 12px;
+    `;
 
         card.onmouseenter = () => {
             card.style.transform = 'translateY(-1px)';
@@ -419,100 +841,100 @@ document.addEventListener('DOMContentLoaded', function () {
             card.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.08)';
         };
 
-        // Compact job information
+        // UPDATED: Compact job information - show customer name instead of auto-generated text
         const jobInfo = task.docNo ? `
-            <div style="background: #f1f5f9; padding: 6px 8px; border-radius: 4px; margin: 8px 0; font-size: 0.8rem; line-height: 1.3;">
-                <strong>📋 ${task.docNo}</strong> • ${task.customerName} • <strong>${task.itemCode}</strong> (${task.qty})
-                ${task.currentStage ? ` • Stage: ${task.currentStage}` : ''}
-            </div>
-        ` : '';
+        <div style="background: #f1f5f9; padding: 8px 10px; border-radius: 4px; margin: 8px 0; font-size: 0.8rem; line-height: 1.3;">
+            <strong>📋 ${task.docNo}</strong> • ${task.customerName} • <strong>${task.itemCode}</strong> (${task.qty})
+            ${task.currentStage ? ` • Stage: ${task.currentStage}` : ''}
+        </div>
+    ` : '';
 
         // Compact completion/rejection info
         const statusInfo = (() => {
             if (task.status === 'completed' && task.completedAt) {
                 return `<div style="background: #f0fdf4; padding: 4px 8px; border-radius: 4px; margin: 6px 0; font-size: 0.75rem; color: #065f46;">
-                    ✅ Completed: ${new Date(task.completedAt).toLocaleDateString()}
-                    ${task.completionRemarks ? ` • ${task.completionRemarks}` : ''}
-                </div>`;
+                ✅ Completed: ${new Date(task.completedAt).toLocaleDateString()}
+                ${task.completionRemarks ? ` • ${task.completionRemarks}` : ''}
+            </div>`;
             } else if (task.status === 'rejected' && task.rejectionReason) {
                 return `<div style="background: #fef2f2; padding: 4px 8px; border-radius: 4px; margin: 6px 0; font-size: 0.75rem; color: #991b1b;">
-                    ❌ Rejected: ${task.rejectionReason}
-                </div>`;
+                ❌ Rejected: ${task.rejectionReason}
+            </div>`;
             }
             return '';
         })();
 
         card.innerHTML = `
-            <!-- Compact Header -->
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
-                <div style="flex: 1; min-width: 0;">
-                    <h4 style="color: #1e293b; margin: 0 0 4px 0; font-size: 1rem; font-weight: 600; line-height: 1.3; overflow: hidden; text-overflow: ellipsis;">
-                        ${task.title}
-                    </h4>
-                    <div style="font-size: 0.75rem; color: #64748b; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                        <span>👤 <strong>${assignedUserName}</strong></span>
-                        <span style="color: ${priorityColor}; font-weight: 600;">🏷️ ${task.priority.toUpperCase()}</span>
-                        <span>📁 ${task.type.toUpperCase()}</span>
-                    </div>
-                </div>
-                <div style="flex-shrink: 0; margin-left: 10px;">
-                    <span style="
-                        padding: 3px 8px; 
-                        border-radius: 12px; 
-                        font-size: 0.7rem; 
-                        font-weight: 600;
-                        background: ${statusColor}15;
-                        color: ${statusColor};
-                        border: 1px solid ${statusColor}30;
-                        white-space: nowrap;
-                        display: inline-block;
-                    ">
-                        ${isOverdue ? '⚠️ OVERDUE' : task.status.replace('_', ' ').toUpperCase()}
-                    </span>
+        <!-- Compact Header -->
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
+            <div style="flex: 1; min-width: 0;">
+                <h4 style="color: #1e293b; margin: 0 0 4px 0; font-size: 1rem; font-weight: 600; line-height: 1.3; overflow: hidden; text-overflow: ellipsis;">
+                    ${task.title}
+                </h4>
+                <div style="font-size: 0.75rem; color: #64748b; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                    <span>👤 <strong>${assignedUserName}</strong> (${assignedUserDept})</span>
+                    <span style="color: ${priorityColor}; font-weight: 600;">🏷️ ${task.priority.toUpperCase()}</span>
+                    <span>📁 ${task.type.toUpperCase()}</span>
                 </div>
             </div>
-
-            <!-- Compact Description -->
-            <div style="color: #475569; margin-bottom: 10px; font-size: 0.85rem; line-height: 1.4; 
-                        display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
-                ${task.description}
+            <div style="flex-shrink: 0; margin-left: 10px;">
+                <span style="
+                    padding: 3px 8px; 
+                    border-radius: 12px; 
+                    font-size: 0.7rem; 
+                    font-weight: 600;
+                    background: ${statusColor}15;
+                    color: ${statusColor};
+                    border: 1px solid ${statusColor}30;
+                    white-space: nowrap;
+                    display: inline-block;
+                ">
+                    ${isOverdue ? '⚠️ OVERDUE' : task.status.replace('_', ' ').toUpperCase()}
+                </span>
             </div>
+        </div>
 
-            ${jobInfo}
-            ${statusInfo}
+        <!-- Compact Description -->
+        <div style="color: #475569; margin-bottom: 10px; font-size: 0.85rem; line-height: 1.4; 
+                    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+            ${task.description}
+        </div>
 
-            <!-- Compact Footer -->
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 12px; padding-top: 10px; border-top: 1px solid #f1f5f9;">
-                <div style="font-size: 0.75rem; color: #64748b; display: flex; align-items: center; gap: 10px;">
-                    <span>📅 ${dueDate.toLocaleDateString()}</span>
-                    ${isOverdue ? '<span style="color: #ef4444; font-weight: 600;">⚠️ Overdue</span>' : ''}
-                </div>
-                <div style="display: flex; gap: 4px;">
-                    ${task.status === 'pending_approval' ? `
-                        <button onclick="approveTask('${task._id}')" 
-                                style="background: #10b981; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.7rem; font-weight: 500;">
-                            ✓
-                        </button>
-                        <button onclick="rejectTask('${task._id}')" 
-                                style="background: #ef4444; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.7rem; font-weight: 500;">
-                            ✗
-                        </button>
-                    ` : ''}
-                    <button onclick="viewTaskDetails('${task._id}')" 
-                            style="background: #3b82f6; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.7rem; font-weight: 500;">
-                        👁️
-                    </button>
-                    <button onclick="editTask('${task._id}')" 
-                            style="background: #8b5cf6; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.7rem; font-weight: 500;">
-                        ✏️
-                    </button>
-                    <button onclick="deleteTask('${task._id}')" 
-                            style="background: #6b7280; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.7rem; font-weight: 500;">
-                        🗑️
-                    </button>
-                </div>
+        ${jobInfo}
+        ${statusInfo}
+
+        <!-- Compact Footer -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 12px; padding-top: 10px; border-top: 1px solid #f1f5f9;">
+            <div style="font-size: 0.75rem; color: #64748b; display: flex; align-items: center; gap: 10px;">
+                <span>📅 ${dueDate.toLocaleDateString()}</span>
+                ${isOverdue ? '<span style="color: #ef4444; font-weight: 600;">⚠️ Overdue</span>' : ''}
             </div>
-        `;
+            <div style="display: flex; gap: 4px;">
+                ${task.status === 'pending_approval' ? `
+                    <button onclick="approveTask('${task._id}')" 
+                            style="background: #10b981; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.7rem; font-weight: 500;">
+                        ✓
+                    </button>
+                    <button onclick="rejectTask('${task._id}')" 
+                            style="background: #ef4444; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.7rem; font-weight: 500;">
+                        ✗
+                    </button>
+                ` : ''}
+                <button onclick="viewTaskDetails('${task._id}')" 
+                        style="background: #3b82f6; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.7rem; font-weight: 500;">
+                    👁️
+                </button>
+                <button onclick="editTask('${task._id}')" 
+                        style="background: #8b5cf6; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.7rem; font-weight: 500;">
+                    ✏️
+                </button>
+                <button onclick="deleteTask('${task._id}')" 
+                        style="background: #6b7280; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.7rem; font-weight: 500;">
+                    🗑️
+                </button>
+            </div>
+        </div>
+    `;
 
         return card;
     }
