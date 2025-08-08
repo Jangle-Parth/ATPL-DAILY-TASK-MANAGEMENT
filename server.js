@@ -590,7 +590,7 @@ app.post('/api/login', async (req, res) => {
             isActive: true
         });
 
-        if (!user || !user.comparePassword(password)) {
+        if (!user || (await !user.comparePassword(password))) {
             return res.status(401).json({ error: 'Invalid credentials' });
         }
 
