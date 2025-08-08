@@ -1412,260 +1412,401 @@
 
                 <!-- Due Dates Section -->
                 <section id="due-dates" class="section">
-                    <div class="section-header">
-                        <h3>Due Dates Dashboard</h3>
-                    </div>
+    <div class="section-header">
+        <h3>Due Dates Dashboard</h3>
+        <div class="action-buttons">
+            <button class="btn btn-secondary" id="refreshDueDates">
+                <i class="fas fa-sync-alt"></i>
+                Refresh
+            </button>
+        </div>
+    </div>
 
-                    <div class="analytics-overview">
-                        <div class="analytics-card">
-                            <h3>
-                                <i class="fas fa-calendar-day"></i>
-                                Due Today
-                            </h3>
-                            <div class="chart-container">
-                                <div class="metric-row">
-                                    <span class="metric-label">Tasks Due Today</span>
-                                    <span class="metric-value" id="dueToday">0</span>
-                                </div>
-                                <div id="dueTodayTasks" style="margin-top: 1rem; max-height: 200px; overflow-y: auto;">
-                                    <!-- Dynamic content -->
-                                </div>
-                            </div>
-                        </div>
+    <!-- Due Dates Overview - Vertical Stack -->
+    <div class="due-dates-container">
+        
+        <!-- Overdue Tasks - High Priority -->
+        <div class="due-date-section overdue-section">
+            <div class="due-section-header">
+                <div class="section-title">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <h4>Overdue Tasks</h4>
+                    <span class="task-count" id="overdueCount">0</span>
+                </div>
+                <div class="section-actions">
+                    <button class="btn btn-small btn-danger" onclick="showOverdueTasks()">
+                        View All
+                    </button>
+                </div>
+            </div>
+            <div class="tasks-preview" id="overdueTasksPreview">
+                <div class="loading-state">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    Loading overdue tasks...
+                </div>
+            </div>
+        </div>
 
-                        <div class="analytics-card">
-                            <h3>
-                                <i class="fas fa-calendar-plus"></i>
-                                Due Tomorrow
-                            </h3>
-                            <div class="chart-container">
-                                <div class="metric-row">
-                                    <span class="metric-label">Tasks Due Tomorrow</span>
-                                    <span class="metric-value" id="dueTomorrow">0</span>
-                                </div>
-                                <div id="dueTomorrowTasks" style="margin-top: 1rem; max-height: 200px; overflow-y: auto;">
-                                    <!-- Dynamic content -->
-                                </div>
-                            </div>
-                        </div>
+        <!-- Due Today -->
+        <div class="due-date-section today-section">
+            <div class="due-section-header">
+                <div class="section-title">
+                    <i class="fas fa-calendar-day"></i>
+                    <h4>Due Today</h4>
+                    <span class="task-count" id="dueTodayCount">0</span>
+                </div>
+                <div class="section-actions">
+                    <button class="btn btn-small btn-primary" onclick="showTodayTasks()">
+                        View All
+                    </button>
+                </div>
+            </div>
+            <div class="tasks-preview" id="dueTodayTasksPreview">
+                <div class="loading-state">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    Loading today's tasks...
+                </div>
+            </div>
+        </div>
 
-                        <div class="analytics-card">
-                            <h3>
-                                <i class="fas fa-calendar-week"></i>
-                                Due This Week
-                            </h3>
-                            <div class="chart-container">
-                                <div class="metric-row">
-                                    <span class="metric-label">Tasks Due This Week</span>
-                                    <span class="metric-value" id="dueThisWeek">0</span>
-                                </div>
-                                <div id="dueThisWeekTasks" style="margin-top: 1rem; max-height: 200px; overflow-y: auto;">
-                                    <!-- Dynamic content -->
-                                </div>
-                            </div>
-                        </div>
+        <!-- Due Tomorrow -->
+        <div class="due-date-section tomorrow-section">
+            <div class="due-section-header">
+                <div class="section-title">
+                    <i class="fas fa-calendar-plus"></i>
+                    <h4>Due Tomorrow</h4>
+                    <span class="task-count" id="dueTomorrowCount">0</span>
+                </div>
+                <div class="section-actions">
+                    <button class="btn btn-small btn-secondary" onclick="showTomorrowTasks()">
+                        View All
+                    </button>
+                </div>
+            </div>
+            <div class="tasks-preview" id="dueTomorrowTasksPreview">
+                <div class="loading-state">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    Loading tomorrow's tasks...
+                </div>
+            </div>
+        </div>
 
-                        <div class="analytics-card">
-                            <h3>
-                                <i class="fas fa-calendar-alt"></i>
-                                Due This Month
-                            </h3>
-                            <div class="chart-container">
-                                <div class="metric-row">
-                                    <span class="metric-label">Tasks Due This Month</span>
-                                    <span class="metric-value" id="dueThisMonth">0</span>
-                                </div>
-                                <div id="dueThisMonthTasks" style="margin-top: 1rem; max-height: 200px; overflow-y: auto;">
-                                    <!-- Dynamic content -->
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </section>
+        <!-- Due This Week -->
+        <div class="due-date-section week-section">
+            <div class="due-section-header">
+                <div class="section-title">
+                    <i class="fas fa-calendar-week"></i>
+                    <h4>Due This Week</h4>
+                    <span class="task-count" id="dueThisWeekCount">0</span>
+                </div>
+                <div class="section-actions">
+                    <button class="btn btn-small btn-secondary" onclick="showWeekTasks()">
+                        View All
+                    </button>
+                </div>
+            </div>
+            <div class="tasks-preview" id="dueThisWeekTasksPreview">
+                <div class="loading-state">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    Loading this week's tasks...
+                </div>
+            </div>
+        </div>
+
+        <!-- Due This Month -->
+        <div class="due-date-section month-section">
+            <div class="due-section-header">
+                <div class="section-title">
+                    <i class="fas fa-calendar-alt"></i>
+                    <h4>Due This Month</h4>
+                    <span class="task-count" id="dueThisMonthCount">0</span>
+                </div>
+                <div class="section-actions">
+                    <button class="btn btn-small btn-secondary" onclick="showMonthTasks()">
+                        View All
+                    </button>
+                </div>
+            </div>
+            <div class="tasks-preview" id="dueThisMonthTasksPreview">
+                <div class="loading-state">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    Loading this month's tasks...
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Summary Stats Bar -->
+    <div class="due-dates-summary">
+        <div class="summary-stat">
+            <div class="stat-number" id="totalDueTasks">0</div>
+            <div class="stat-label">Total Due Tasks</div>
+        </div>
+        <div class="summary-stat">
+            <div class="stat-number" id="dueTodayTotal">0</div>
+            <div class="stat-label">Due Today</div>
+        </div>
+        <div class="summary-stat">
+            <div class="stat-number" id="overdueCritical">0</div>
+            <div class="stat-label">Critical Overdue</div>
+        </div>
+        <div class="summary-stat">
+            <div class="stat-number" id="completionRateToday">0%</div>
+            <div class="stat-label">Today's Progress</div>
+        </div>
+    </div>
+</section>
 
                 <!-- Enhanced Analytics Section -->
                 <section id="analytics" class="section">
-                    <div class="section-header">
-                        <h3>My Analytics</h3>
-                        <div class="action-buttons">
-                            <button class="btn btn-secondary">
-                                <i class="fas fa-download"></i>
-                                Export Report
-                            </button>
+    <div class="section-header">
+        <h3>My Analytics</h3>
+        <div class="action-buttons">
+            <select id="analyticsTimeRange" class="form-select">
+                <option value="7">Last 7 Days</option>
+                <option value="30" selected>Last 30 Days</option>
+                <option value="90">Last 90 Days</option>
+            </select>
+            <button class="btn btn-secondary">
+                <i class="fas fa-download"></i>
+                Export Report
+            </button>
+        </div>
+    </div>
+
+    <div class="analytics-overview analytics-grid">
+        <!-- Performance Summary Card -->
+        <div class="analytics-card performance-summary">
+            <h3>
+                <i class="fas fa-trophy"></i>
+                Performance Summary
+            </h3>
+            <div class="chart-container">
+                <div class="performance-metrics">
+                    <div class="metric-row">
+                        <span class="metric-label">Task Completion Rate</span>
+                        <span class="metric-value" id="completionRate">--</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">On-Time Delivery</span>
+                        <span class="metric-value" id="onTimeRate">--</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Average Response Time</span>
+                        <span class="metric-value" id="avgResponseTime">--</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Quality Score</span>
+                        <span class="metric-value" id="qualityScore">--</span>
+                    </div>
+                </div>
+                <div class="performance-badge" id="performanceBadge">
+                    <div class="badge-icon">🌟</div>
+                    <div class="badge-text">Excellent Performer</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Task Distribution Chart -->
+        <div class="analytics-card">
+            <h3>
+                <i class="fas fa-chart-pie"></i>
+                Task Distribution
+            </h3>
+            <div class="chart-container">
+                <div class="donut-chart" id="taskDistributionChart">
+                    <svg width="200" height="200" viewBox="0 0 200 200">
+                        <circle cx="100" cy="100" r="80" fill="none" stroke="#e5e7eb" stroke-width="20"/>
+                        <circle cx="100" cy="100" r="80" fill="none" stroke="#10b981" stroke-width="20" 
+                                stroke-dasharray="0 502" id="completedCircle" stroke-linecap="round" 
+                                transform="rotate(-90 100 100)"/>
+                        <circle cx="100" cy="100" r="80" fill="none" stroke="#f59e0b" stroke-width="20" 
+                                stroke-dasharray="0 502" id="pendingCircle" stroke-linecap="round" 
+                                transform="rotate(-90 100 100)"/>
+                        <circle cx="100" cy="100" r="80" fill="none" stroke="#ef4444" stroke-width="20" 
+                                stroke-dasharray="0 502" id="overdueCircle" stroke-linecap="round" 
+                                transform="rotate(-90 100 100)"/>
+                    </svg>
+                    <div class="chart-center">
+                        <div class="total-tasks" id="totalTasksChart">0</div>
+                        <div class="chart-label">Total Tasks</div>
+                    </div>
+                </div>
+                <div class="chart-legend">
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #10b981;"></div>
+                        <span>Completed (<span id="completedCount">0</span>)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #f59e0b;"></div>
+                        <span>Pending (<span id="pendingCount">0</span>)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #ef4444;"></div>
+                        <span>Overdue (<span id="overdueCount">0</span>)</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Priority Breakdown -->
+        <div class="analytics-card">
+            <h3>
+                <i class="fas fa-exclamation-triangle"></i>
+                Priority Breakdown
+            </h3>
+            <div class="chart-container">
+                <div class="priority-bars">
+                    <div class="priority-item">
+                        <div class="priority-header">
+                            <span class="priority-label">Low Priority</span>
+                            <span class="priority-count" id="lowPriorityCount">0</span>
+                        </div>
+                        <div class="priority-bar">
+                            <div class="priority-fill low" id="lowPriorityBar"></div>
                         </div>
                     </div>
-
-                    <div class="analytics-overview">
-                        <div class="analytics-card">
-                            <h3>
-                                <i class="fas fa-chart-pie"></i>
-                                Task Completion Rate
-                            </h3>
-                            <div class="chart-container">
-                                <div class="progress-ring">
-                                    <svg>
-                                        <circle class="bg" cx="60" cy="60" r="50"></circle>
-                                        <circle class="progress" cx="60" cy="60" r="50" 
-                                                stroke-dasharray="314" stroke-dashoffset="62.8"></circle>
-                                    </svg>
-                                    <div class="progress-text">
-                                        <div class="progress-percentage">80%</div>
-                                        <div class="progress-label">Completed</div>
-                                    </div>
-                                </div>
-                            </div>
+                    <div class="priority-item">
+                        <div class="priority-header">
+                            <span class="priority-label">Medium Priority</span>
+                            <span class="priority-count" id="mediumPriorityCount">0</span>
                         </div>
-
-                        <div class="analytics-card">
-                            <h3>
-                                <i class="fas fa-chart-line"></i>
-                                Performance Trend
-                            </h3>
-                            <div class="chart-container">
-                                <div class="trend-chart">
-                                    <div class="trend-line"></div>
-                                    <div class="trend-stats">
-                                        <div class="trend-value">+15%</div>
-                                        <div class="trend-label">Performance Improvement</div>
-                                    </div>
-                                </div>
-                            </div>
+                        <div class="priority-bar">
+                            <div class="priority-fill medium" id="mediumPriorityBar"></div>
                         </div>
-
-                        <div class="analytics-card">
-                            <h3>
-                                <i class="fas fa-clock"></i>
-                                Time Management
-                            </h3>
-                            <div class="chart-container">
-                                <div class="performance-metrics">
-                                    <div class="metric-item">
-                                        <span class="metric-label">Average Completion Time</span>
-                                        <span class="metric-value">2.3 days</span>
-                                    </div>
-                                    <div class="metric-item">
-                                        <span class="metric-label">On-Time Delivery</span>
-                                        <span class="metric-value">92%</span>
-                                    </div>
-                                    <div class="metric-item">
-                                        <span class="metric-label">Fastest Completion</span>
-                                        <span class="metric-value">4 hours</span>
-                                    </div>
-                                    <div class="metric-item">
-                                        <span class="metric-label">Late Submissions</span>
-                                        <span class="metric-value">2 tasks</span>
-                                    </div>
-                                </div>
-                            </div>
+                    </div>
+                    <div class="priority-item">
+                        <div class="priority-header">
+                            <span class="priority-label">High Priority</span>
+                            <span class="priority-count" id="highPriorityCount">0</span>
                         </div>
-
-                        <div class="analytics-card">
-                            <h3>
-                                <i class="fas fa-tasks"></i>
-                                Task Breakdown
-                            </h3>
-                            <div class="chart-container">
-                                <div class="performance-metrics">
-                                    <div class="metric-item">
-                                        <span class="metric-label">Job-Auto Tasks</span>
-                                        <span class="metric-value">12 (50%)</span>
-                                    </div>
-                                    <div class="metric-item">
-                                        <span class="metric-label">Manual Tasks</span>
-                                        <span class="metric-value">8 (33%)</span>
-                                    </div>
-                                    <div class="metric-item">
-                                        <span class="metric-label">Admin Tasks</span>
-                                        <span class="metric-value">3 (13%)</span>
-                                    </div>
-                                    <div class="metric-item">
-                                        <span class="metric-label">User Tasks</span>
-                                        <span class="metric-value">1 (4%)</span>
-                                    </div>
-                                </div>
-                            </div>
+                        <div class="priority-bar">
+                            <div class="priority-fill high" id="highPriorityBar"></div>
                         </div>
-
-                        <div class="analytics-card">
-                            <h3>
-                                <i class="fas fa-star"></i>
-                                Priority Distribution
-                            </h3>
-                            <div class="chart-container">
-                                <div style="display: flex; flex-direction: column; gap: 1rem;">
-                                    <div>
-                                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
-                                            <span>Low Priority</span>
-                                            <span>35%</span>
-                                        </div>
-                                        <div style="background: var(--gray-200); height: 8px; border-radius: 4px;">
-                                            <div style="background: var(--secondary); height: 100%; width: 35%; border-radius: 4px;"></div>
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
-                                            <span>Medium Priority</span>
-                                            <span>40%</span>
-                                        </div>
-                                        <div style="background: var(--gray-200); height: 8px; border-radius: 4px;">
-                                            <div style="background: var(--warning); height: 100%; width: 40%; border-radius: 4px;"></div>
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
-                                            <span>High Priority</span>
-                                            <span>20%</span>
-                                        </div>
-                                        <div style="background: var(--gray-200); height: 8px; border-radius: 4px;">
-                                            <div style="background: var(--danger); height: 100%; width: 20%; border-radius: 4px;"></div>
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
-                                            <span>Urgent</span>
-                                            <span>5%</span>
-                                        </div>
-                                        <div style="background: var(--gray-200); height: 8px; border-radius: 4px;">
-                                            <div style="background: #DC2626; height: 100%; width: 5%; border-radius: 4px;"></div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+                    </div>
+                    <div class="priority-item">
+                        <div class="priority-header">
+                            <span class="priority-label">Urgent</span>
+                            <span class="priority-count" id="urgentPriorityCount">0</span>
                         </div>
+                        <div class="priority-bar">
+                            <div class="priority-fill urgent" id="urgentPriorityBar"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-                        <div class="analytics-card">
-                            <h3>
-                                <i class="fas fa-calendar"></i>
-                                Monthly Summary
-                            </h3>
-                            <div class="chart-container">
-                                <div class="performance-metrics">
-                                    <div class="metric-item">
-                                        <span class="metric-label">Tasks Completed</span>
-                                        <span class="metric-value">
-                                            18
-                                            <span style="color: var(--secondary); font-size: 0.8rem;">
-                                                <i class="fas fa-arrow-up"></i> +25%
-                                            </span>
-                                        </span>
-                                    </div>
-                                    <div class="metric-item">
-                                        <span class="metric-label">Average Rating</span>
-                                        <span class="metric-value">4.8/5.0 ⭐</span>
-                                    </div>
-                                    <div class="metric-item">
-                                        <span class="metric-label">Efficiency Score</span>
-                                        <span class="metric-value">92%</span>
-                                    </div>
-                                    <div class="metric-item">
-                                        <span class="metric-label">Team Rank</span>
-                                        <span class="metric-value">#3 of 24</span>
-                                    </div>
+        <!-- Weekly Activity -->
+        <div class="analytics-card">
+            <h3>
+                <i class="fas fa-chart-line"></i>
+                Weekly Activity
+            </h3>
+            <div class="chart-container">
+                <div class="activity-chart" id="weeklyActivityChart">
+                    <div class="activity-days">
+                        <div class="activity-day" data-day="Mon">
+                            <div class="day-label">Mon</div>
+                            <div class="activity-bar" id="monActivity"></div>
+                            <div class="day-count" id="monCount">0</div>
+                        </div>
+                        <div class="activity-day" data-day="Tue">
+                            <div class="day-label">Tue</div>
+                            <div class="activity-bar" id="tueActivity"></div>
+                            <div class="day-count" id="tueCount">0</div>
+                        </div>
+                        <div class="activity-day" data-day="Wed">
+                            <div class="day-label">Wed</div>
+                            <div class="activity-bar" id="wedActivity"></div>
+                            <div class="day-count" id="wedCount">0</div>
+                        </div>
+                        <div class="activity-day" data-day="Thu">
+                            <div class="day-label">Thu</div>
+                            <div class="activity-bar" id="thuActivity"></div>
+                            <div class="day-count" id="thuCount">0</div>
+                        </div>
+                        <div class="activity-day" data-day="Fri">
+                            <div class="day-label">Fri</div>
+                            <div class="activity-bar" id="friActivity"></div>
+                            <div class="day-count" id="friCount">0</div>
+                        </div>
+                        <div class="activity-day" data-day="Sat">
+                            <div class="day-label">Sat</div>
+                            <div class="activity-bar" id="satActivity"></div>
+                            <div class="day-count" id="satCount">0</div>
+                        </div>
+                        <div class="activity-day" data-day="Sun">
+                            <div class="day-label">Sun</div>
+                            <div class="activity-bar" id="sunActivity"></div>
+                            <div class="day-count" id="sunCount">0</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Department Comparison -->
+        <div class="analytics-card">
+            <h3>
+                <i class="fas fa-users"></i>
+                Department Ranking
+            </h3>
+            <div class="chart-container">
+                <div class="ranking-list" id="departmentRanking">
+                    <div class="ranking-item">
+                        <div class="rank-position">1</div>
+                        <div class="rank-info">
+                            <div class="rank-name">Loading...</div>
+                            <div class="rank-score">-- %</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Goals & Achievements -->
+        <div class="analytics-card">
+            <h3>
+                <i class="fas fa-target"></i>
+                Goals & Achievements
+            </h3>
+            <div class="chart-container">
+                <div class="goals-container">
+                    <div class="goal-item">
+                        <div class="goal-icon">🎯</div>
+                        <div class="goal-info">
+                            <div class="goal-title">Monthly Target</div>
+                            <div class="goal-progress">
+                                <div class="progress-bar">
+                                    <div class="progress-fill" id="monthlyProgress"></div>
                                 </div>
+                                <span class="progress-text" id="monthlyProgressText">0/20</span>
                             </div>
                         </div>
                     </div>
-                </section>
+                    <div class="achievement-badges">
+                        <div class="badge" id="streakBadge">
+                            <div class="badge-icon">🔥</div>
+                            <div class="badge-text">
+                                <div class="badge-title">Streak</div>
+                                <div class="badge-value" id="streakDays">0 days</div>
+                            </div>
+                        </div>
+                        <div class="badge" id="qualityBadge">
+                            <div class="badge-icon">⭐</div>
+                            <div class="badge-text">
+                                <div class="badge-title">Quality</div>
+                                <div class="badge-value" id="qualityLevel">Excellent</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
             </div>
         </main>
     </div>

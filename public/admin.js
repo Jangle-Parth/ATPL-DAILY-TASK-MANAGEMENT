@@ -1570,43 +1570,7 @@ document.addEventListener('DOMContentLoaded', function () {
             </div>
         </div>
 
-        <!-- Top Performers -->
-        <div class="analytics-grid">
-            <div class="analytics-card top-performers" style="grid-column: span 2;">
-                <h3><i class="fas fa-trophy"></i> Top Performers</h3>
-                <div class="performers-list">
-                    ${(data.topPerformers || []).slice(0, 10).map((performer, index) => `
-                        <div class="performer-item ${index < 3 ? `rank-${index + 1}` : ''}">
-                            <div class="performer-rank">
-                                ${index + 1 <= 3 ?
-                    ['🥇', '🥈', '🥉'][index] :
-                    `#${index + 1}`
-                }
-                            </div>
-                            <div class="performer-info">
-                                <div class="performer-name">${performer.user.username}</div>
-                                <div class="performer-dept">${performer.user.department}</div>
-                            </div>
-                            <div class="performer-metrics">
-                                <div class="performer-stat">
-                                    <span class="stat-label">Completion</span>
-                                    <span class="stat-value">${performer.completionRate}%</span>
-                                </div>
-                                <div class="performer-stat">
-                                    <span class="stat-label">On-Time</span>
-                                    <span class="stat-value">${performer.onTimeRate}%</span>
-                                </div>
-                                <div class="performer-stat">
-                                    <span class="stat-label">Total</span>
-                                    <span class="stat-value">${performer.total}</span>
-                                </div>
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
-        </div>
-    `;
+            `;
 
         // Insert into analytics section
         if (existingOverview) {
