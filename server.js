@@ -140,6 +140,8 @@ async function getUsersByDepartment(department) {
     }
 }
 
+
+
 async function createAutoTask(job, status, assignedToId) {
     try {
         const statusKey = status.toLowerCase();
@@ -275,6 +277,35 @@ function calculateDailyTrends(tasks, startDate, endDate) {
     return trends;
 }
 
+function getTasksInTimeRange(tasks, days) {
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - days);
+    return tasks.filter(task => new Date(task.createdAt) >= cutoffDate).length;
+}
+
+function calculateAverageCompletionTime(completedTasks) {
+    if (completedTasks.length === 0) return 0;
+
+    const totalTime = completedTasks.reduce((sum, task) => {
+        if (task.completedAt && task.createdAt) {
+            const created = new Date(task.createdAt);
+            const completed = new Date(task.completedAt);
+            return sum + (completed - created) / (1000 * 60 * 60 * 24);
+        }
+        return sum;
+    }, 0);
+
+    return (totalTime / completedTasks.length).toFixed(1);
+}
+
+function groupTasksByField(tasks, field) {
+    return tasks.reduce((acc, task) => {
+        const value = task[field] || 'unspecified';
+        acc[value] = (acc[value] || 0) + 1;
+        return acc;
+    }, {});
+}
+
 function calculateWeeklyTrends(tasks, startDate, endDate) {
     const weeks = {};
     const weekMs = 7 * 24 * 60 * 60 * 1000;
@@ -298,6 +329,28 @@ function calculateWeeklyTrends(tasks, startDate, endDate) {
     }
 
     return weeks;
+}
+
+function calculatePeakProductivityTime(tasks) {
+    if (!tasks || tasks.length === 0) return '9 AM';
+
+    const hours = Array(24).fill(0);
+
+    tasks.forEach(task => {
+        if (task.completedAt) {
+            const hour = new Date(task.completedAt).getHours();
+            hours[hour]++;
+        }
+    });
+
+    const maxCompletions = Math.max(...hours);
+    if (maxCompletions === 0) return '9 AM';
+
+    const peakHour = hours.indexOf(maxCompletions);
+
+    if (peakHour === 0) return '12 AM';
+    if (peakHour <= 12) return `${peakHour} AM`;
+    return `${peakHour - 12} PM`;
 }
 
 function calculateProductivityTrends(tasks, users) {
@@ -1733,6 +1786,57 @@ app.get('/api/analytics/due-dates', requireAuth, async (req, res) => {
     } catch (error) {
         console.error('Error fetching due dates analytics:', error);
         res.status(500).json({ error: 'Error fetching due dates analytics' });
+    }
+});
+
+app.get('/api/analytics/user-detailed', requireAuth, async (req, res) => {
+    try {
+        const userId = req.userId;
+        const tasks = await Task.find({
+            $or: [
+                { assignedTo: userId },
+                { assignedTo: { $in: [userId] } }
+            ]
+        }).populate('assignedBy', 'username');
+
+        // Calculate detailed statistics
+        const completedTasks = tasks.filter(task => task.status === 'completed');
+        const pendingTasks = tasks.filter(task => task.status === 'pending');
+        const inProgressTasks = tasks.filter(task => task.status === 'in-progress');
+        const overdueTasks = tasks.filter(task => {
+            if (!task.dueDate) return false;
+            return new Date(task.dueDate) < new Date() && task.status !== 'completed';
+        });
+
+        const analytics = {
+            summary: {
+                totalTasks: tasks.length,
+                completedTasks: completedTasks.length,
+                pendingTasks: pendingTasks.length,
+                inProgressTasks: inProgressTasks.length,
+                overdueTasks: overdueTasks.length,
+                completionRate: tasks.length > 0 ? ((completedTasks.length / tasks.length) * 100).toFixed(1) : 0,
+                onTimeRate: completedTasks.length > 0 ? (((completedTasks.length - overdueTasks.length) / completedTasks.length) * 100).toFixed(1) : 100
+            },
+            productivity: {
+                tasksThisWeek: getTasksInTimeRange(tasks, 7),
+                tasksThisMonth: getTasksInTimeRange(tasks, 30),
+                averageCompletionTime: calculateAverageCompletionTime(completedTasks),
+                peakProductivityTime: calculatePeakProductivityTime(completedTasks),
+                streak: calculateCompletionStreak(completedTasks)
+            },
+            breakdown: {
+                byPriority: groupTasksByField(tasks, 'priority'),
+                byType: groupTasksByField(tasks, 'type'),
+                byStatus: groupTasksByField(tasks, 'status'),
+                byDepartment: groupTasksByField(tasks, 'department')
+            }
+        };
+
+        res.json(analytics);
+    } catch (error) {
+        console.error('Error generating detailed analytics:', error);
+        res.status(500).json({ error: 'Error generating analytics' });
     }
 });
 

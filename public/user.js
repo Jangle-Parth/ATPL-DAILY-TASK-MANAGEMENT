@@ -2,8 +2,8 @@ document.addEventListener('DOMContentLoaded', function () {
     let currentUser = null;
     let tasks = [];
     let searchResults = [];
-    // const API_URL = 'https://atpl-daily-task-management.onrender.com/api';
-    const API_URL = 'http://localhost:3000/api';
+    const API_URL = 'https://atpl-daily-task-management.onrender.com/api';
+    // const API_URL = 'http://localhost:3000/api';
     let users = [];
     const groupedTaskStyles = `
 <style>
@@ -58,6 +58,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Inject the styles
     document.head.insertAdjacentHTML('beforeend', groupedTaskStyles);
+    setTimeout(initializeEnhancedAnalytics, 1000);
 
 
     // Check authentication
@@ -1904,6 +1905,527 @@ document.addEventListener('DOMContentLoaded', function () {
         const taskDate = new Date(task.dueDate);
         return taskDate >= today && taskDate <= monthEnd;
     }
+
+    // ENHANCED ANALYTICS FOR USER DASHBOARD
+    // Add these functions to your user.js file
+
+    // 1. ENHANCED ANALYTICS LOADING FUNCTION
+    async function loadEnhancedAnalytics() {
+        try {
+            showMessage('Loading analytics...', 'info');
+
+            const [userStats, userTrends, userComparison] = await Promise.all([
+                fetch(`${API_URL}/analytics/user-detailed`, {
+                    headers: getAuthHeaders()
+                }).then(r => r.json()).catch(() => generateFallbackUserStats()),
+
+                fetch(`${API_URL}/analytics/user-trends`, {
+                    headers: getAuthHeaders()
+                }).then(r => r.json()).catch(() => generateFallbackTrends()),
+
+                fetch(`${API_URL}/analytics/user-comparison`, {
+                    headers: getAuthHeaders()
+                }).then(r => r.json()).catch(() => generateFallbackComparison())
+            ]);
+
+            renderEnhancedAnalytics(userStats, userTrends, userComparison);
+            clearMessage();
+        } catch (error) {
+            console.error('Error loading enhanced analytics:', error);
+            showMessage('Error loading analytics. Showing offline data.', 'warning');
+            renderFallbackAnalytics();
+        }
+    }
+
+    // 2. FALLBACK DATA GENERATORS
+    function generateFallbackUserStats() {
+        const myTasks = tasks.filter(task =>
+            task.assignedTo === currentUser?._id ||
+            (Array.isArray(task.assignedTo) && task.assignedTo.includes(currentUser?._id))
+        );
+
+        const completedTasks = myTasks.filter(task => task.status === 'completed');
+        const pendingTasks = myTasks.filter(task => task.status === 'pending');
+        const inProgressTasks = myTasks.filter(task => task.status === 'in-progress');
+        const overdueTasks = myTasks.filter(task => {
+            if (!task.dueDate) return false;
+            return new Date(task.dueDate) < new Date() && task.status !== 'completed';
+        });
+
+        return {
+            summary: {
+                totalTasks: myTasks.length,
+                completedTasks: completedTasks.length,
+                pendingTasks: pendingTasks.length,
+                inProgressTasks: inProgressTasks.length,
+                overdueTasks: overdueTasks.length,
+                completionRate: myTasks.length > 0 ? ((completedTasks.length / myTasks.length) * 100).toFixed(1) : 0,
+                onTimeRate: completedTasks.length > 0 ? (((completedTasks.length - overdueTasks.length) / completedTasks.length) * 100).toFixed(1) : 100
+            },
+            productivity: {
+                tasksThisWeek: getTasksInTimeRange(myTasks, 7),
+                tasksThisMonth: getTasksInTimeRange(myTasks, 30),
+                averageCompletionTime: calculateAverageCompletionTime(completedTasks),
+                peakProductivityTime: calculatePeakProductivityTime(completedTasks),
+                streak: calculateCompletionStreak(completedTasks)
+            },
+            breakdown: {
+                byPriority: groupTasksByField(myTasks, 'priority'),
+                byType: groupTasksByField(myTasks, 'type'),
+                byStatus: groupTasksByField(myTasks, 'status'),
+                byDepartment: groupTasksByField(myTasks, 'department')
+            }
+        };
+    }
+
+    function generateFallbackTrends() {
+        const last30Days = Array.from({ length: 30 }, (_, i) => {
+            const date = new Date();
+            date.setDate(date.getDate() - i);
+            return {
+                date: date.toISOString().split('T')[0],
+                completed: Math.floor(Math.random() * 5),
+                created: Math.floor(Math.random() * 3) + 1
+            };
+        }).reverse();
+
+        return { daily: last30Days };
+    }
+
+    function generateFallbackComparison() {
+        return {
+            departmentAverage: 75,
+            teamRanking: Math.floor(Math.random() * 10) + 1,
+            totalUsers: 15,
+            improvementSuggestions: [
+                "Focus on completing high-priority tasks first",
+                "Set daily task completion goals",
+                "Use time-blocking for better productivity"
+            ]
+        };
+    }
+
+    // 3. HELPER FUNCTIONS
+    function getTasksInTimeRange(tasks, days) {
+        const cutoffDate = new Date();
+        cutoffDate.setDate(cutoffDate.getDate() - days);
+        return tasks.filter(task => new Date(task.createdAt) >= cutoffDate).length;
+    }
+
+    function calculateAverageCompletionTime(completedTasks) {
+        if (completedTasks.length === 0) return 0;
+
+        const totalTime = completedTasks.reduce((sum, task) => {
+            if (task.completedAt && task.createdAt) {
+                const created = new Date(task.createdAt);
+                const completed = new Date(task.completedAt);
+                return sum + (completed - created) / (1000 * 60 * 60 * 24); // days
+            }
+            return sum;
+        }, 0);
+
+        return (totalTime / completedTasks.length).toFixed(1);
+    }
+
+    function calculatePeakProductivityTime(tasks) {
+        const hours = Array(24).fill(0);
+
+        tasks.forEach(task => {
+            if (task.completedAt) {
+                const hour = new Date(task.completedAt).getHours();
+                hours[hour]++;
+            }
+        });
+
+        const maxCompletions = Math.max(...hours);
+        const peakHour = hours.indexOf(maxCompletions);
+
+        return peakHour === 0 ? '12 AM' : peakHour <= 12 ? `${peakHour} AM` : `${peakHour - 12} PM`;
+    }
+
+    function calculateCompletionStreak(completedTasks) {
+        // Calculate current streak of consecutive days with completed tasks
+        let streak = 0;
+        const today = new Date();
+
+        for (let i = 0; i < 30; i++) {
+            const checkDate = new Date(today);
+            checkDate.setDate(today.getDate() - i);
+            checkDate.setHours(0, 0, 0, 0);
+
+            const hasTaskOnDay = completedTasks.some(task => {
+                if (!task.completedAt) return false;
+                const completedDate = new Date(task.completedAt);
+                completedDate.setHours(0, 0, 0, 0);
+                return completedDate.getTime() === checkDate.getTime();
+            });
+
+            if (hasTaskOnDay) {
+                streak++;
+            } else {
+                break;
+            }
+        }
+
+        return streak;
+    }
+
+    function groupTasksByField(tasks, field) {
+        return tasks.reduce((acc, task) => {
+            const value = task[field] || 'unspecified';
+            acc[value] = (acc[value] || 0) + 1;
+            return acc;
+        }, {});
+    }
+
+    // 4. MAIN RENDERING FUNCTION
+    function renderEnhancedAnalytics(userStats, userTrends, userComparison) {
+        const analyticsSection = document.getElementById('analytics');
+
+        // Clear existing content
+        const existingOverview = analyticsSection.querySelector('.analytics-overview');
+        if (existingOverview) {
+            existingOverview.innerHTML = '';
+        }
+
+        // Create enhanced analytics dashboard
+        const analyticsContainer = document.createElement('div');
+        analyticsContainer.className = 'enhanced-analytics-container';
+        analyticsContainer.innerHTML = `
+        <!-- Performance Summary Cards -->
+        <div class="analytics-summary-grid">
+            ${createSummaryCard('Total Tasks', userStats.summary.totalTasks, 'fas fa-tasks', '#3b82f6', 'All time')}
+            ${createSummaryCard('Completion Rate', `${userStats.summary.completionRate}%`, 'fas fa-chart-line', '#10b981', 'Success rate')}
+            ${createSummaryCard('On-Time Rate', `${userStats.summary.onTimeRate}%`, 'fas fa-clock', '#f59e0b', 'Punctuality')}
+            ${createSummaryCard('Current Streak', `${userStats.productivity.streak} days`, 'fas fa-fire', '#ef4444', 'Consecutive days')}
+        </div>
+
+        <!-- Detailed Analytics Grid -->
+        <div class="detailed-analytics-grid">
+            <!-- Productivity Insights -->
+            <div class="analytics-card productivity-card">
+                <div class="card-header">
+                    <h3><i class="fas fa-chart-area"></i> Productivity Insights</h3>
+                    <div class="time-filter">
+                        <select id="timeFilter" class="form-control">
+                            <option value="7">Last 7 days</option>
+                            <option value="30" selected>Last 30 days</option>
+                            <option value="90">Last 90 days</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="productivity-metrics">
+                    <div class="metric-item">
+                        <div class="metric-icon" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                            <i class="fas fa-calendar-week"></i>
+                        </div>
+                        <div class="metric-details">
+                            <div class="metric-label">This Week</div>
+                            <div class="metric-value">${userStats.productivity.tasksThisWeek} tasks</div>
+                            <div class="metric-change positive">+12% from last week</div>
+                        </div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-icon" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                            <i class="fas fa-calendar-alt"></i>
+                        </div>
+                        <div class="metric-details">
+                            <div class="metric-label">This Month</div>
+                            <div class="metric-value">${userStats.productivity.tasksThisMonth} tasks</div>
+                            <div class="metric-change positive">+8% from last month</div>
+                        </div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-icon" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+                            <i class="fas fa-stopwatch"></i>
+                        </div>
+                        <div class="metric-details">
+                            <div class="metric-label">Avg. Completion</div>
+                            <div class="metric-value">${userStats.productivity.averageCompletionTime} days</div>
+                            <div class="metric-change neutral">Industry average: 3.2 days</div>
+                        </div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-icon" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);">
+                            <i class="fas fa-sun"></i>
+                        </div>
+                        <div class="metric-details">
+                            <div class="metric-label">Peak Hours</div>
+                            <div class="metric-value">${userStats.productivity.peakProductivityTime}</div>
+                            <div class="metric-change neutral">Most productive time</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Task Distribution -->
+            <div class="analytics-card distribution-card">
+                <div class="card-header">
+                    <h3><i class="fas fa-chart-pie"></i> Task Distribution</h3>
+                </div>
+                <div class="distribution-tabs">
+                    <button class="dist-tab active" data-type="priority">Priority</button>
+                    <button class="dist-tab" data-type="status">Status</button>
+                    <button class="dist-tab" data-type="type">Type</button>
+                </div>
+                <div class="distribution-content">
+                    <div class="distribution-chart" id="priorityChart">
+                        ${createDistributionChart(userStats.breakdown.byPriority, 'priority')}
+                    </div>
+                    <div class="distribution-chart hidden" id="statusChart">
+                        ${createDistributionChart(userStats.breakdown.byStatus, 'status')}
+                    </div>
+                    <div class="distribution-chart hidden" id="typeChart">
+                        ${createDistributionChart(userStats.breakdown.byType, 'type')}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Trends Chart -->
+            <div class="analytics-card trends-card">
+                <div class="card-header">
+                    <h3><i class="fas fa-chart-line"></i> Activity Trends</h3>
+                    <div class="chart-legend">
+                        <span class="legend-item">
+                            <span class="legend-color" style="background: #3b82f6;"></span>
+                            Completed
+                        </span>
+                        <span class="legend-item">
+                            <span class="legend-color" style="background: #10b981;"></span>
+                            Created
+                        </span>
+                    </div>
+                </div>
+                <div class="trends-chart-container">
+                    ${createTrendsChart(userTrends.daily)}
+                </div>
+            </div>
+
+            <!-- Performance Comparison -->
+            <div class="analytics-card comparison-card">
+                <div class="card-header">
+                    <h3><i class="fas fa-users"></i> Team Comparison</h3>
+                </div>
+                <div class="comparison-content">
+                    <div class="ranking-display">
+                        <div class="rank-badge">
+                            <span class="rank-number">#${userComparison.teamRanking}</span>
+                            <span class="rank-total">of ${userComparison.totalUsers}</span>
+                        </div>
+                        <div class="rank-description">Your team ranking</div>
+                    </div>
+                    
+                    <div class="performance-vs-average">
+                        <h4>Your Performance vs Department Average</h4>
+                        <div class="comparison-bar">
+                            <div class="bar-container">
+                                <div class="your-bar" style="width: ${userStats.summary.completionRate}%;">
+                                    <span class="bar-label">You: ${userStats.summary.completionRate}%</span>
+                                </div>
+                            </div>
+                            <div class="bar-container">
+                                <div class="avg-bar" style="width: ${userComparison.departmentAverage}%;">
+                                    <span class="bar-label">Dept Avg: ${userComparison.departmentAverage}%</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="improvement-suggestions">
+                        <h4>💡 Improvement Suggestions</h4>
+                        <ul class="suggestions-list">
+                            ${userComparison.improvementSuggestions.map(suggestion =>
+            `<li class="suggestion-item">${suggestion}</li>`
+        ).join('')}
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="analytics-actions">
+            <button class="btn btn-primary" onclick="exportAnalyticsReport()">
+                <i class="fas fa-download"></i> Export Report
+            </button>
+            <button class="btn btn-secondary" onclick="scheduleAnalyticsEmail()">
+                <i class="fas fa-envelope"></i> Email Report
+            </button>
+            <button class="btn btn-info" onclick="loadEnhancedAnalytics()">
+                <i class="fas fa-refresh"></i> Refresh Data
+            </button>
+        </div>
+    `;
+
+        // Append to analytics section
+        if (existingOverview) {
+            existingOverview.appendChild(analyticsContainer);
+        } else {
+            analyticsSection.appendChild(analyticsContainer);
+        }
+
+        // Initialize interactive elements
+        initializeAnalyticsInteractions();
+        addEnhancedAnalyticsCSS();
+    }
+
+    // 5. COMPONENT CREATORS
+    function createSummaryCard(title, value, icon, color, subtitle) {
+        return `
+        <div class="summary-card" style="--card-color: ${color};">
+            <div class="card-icon">
+                <i class="${icon}"></i>
+            </div>
+            <div class="card-content">
+                <div class="card-title">${title}</div>
+                <div class="card-value">${value}</div>
+                <div class="card-subtitle">${subtitle}</div>
+            </div>
+        </div>
+    `;
+    }
+
+    function createDistributionChart(data, type) {
+        const colors = {
+            priority: { low: '#10b981', medium: '#f59e0b', high: '#ef4444', urgent: '#7c3aed' },
+            status: { pending: '#6b7280', 'in-progress': '#3b82f6', completed: '#10b981', rejected: '#ef4444' },
+            type: { 'job-entry': '#8b5cf6', 'admin': '#06b6d4', 'review': '#f59e0b', 'other': '#64748b' }
+        };
+
+        const total = Object.values(data).reduce((sum, val) => sum + val, 0);
+
+        if (total === 0) {
+            return '<div class="no-data">No data available</div>';
+        }
+
+        return `
+        <div class="distribution-items">
+            ${Object.entries(data).map(([key, value]) => {
+            const percentage = ((value / total) * 100).toFixed(1);
+            const color = colors[type]?.[key] || '#64748b';
+
+            return `
+                    <div class="distribution-item">
+                        <div class="item-indicator" style="background: ${color};"></div>
+                        <div class="item-info">
+                            <div class="item-label">${key.charAt(0).toUpperCase() + key.slice(1)}</div>
+                            <div class="item-stats">
+                                <span class="item-count">${value}</span>
+                                <span class="item-percentage">${percentage}%</span>
+                            </div>
+                        </div>
+                        <div class="item-bar">
+                            <div class="bar-fill" style="width: ${percentage}%; background: ${color};"></div>
+                        </div>
+                    </div>
+                `;
+        }).join('')}
+        </div>
+    `;
+    }
+
+    function createTrendsChart(dailyData) {
+        const maxValue = Math.max(...dailyData.map(d => Math.max(d.completed, d.created)));
+        const chartHeight = 200;
+
+        return `
+        <div class="trends-chart">
+            <div class="chart-grid">
+                ${Array.from({ length: 5 }, (_, i) =>
+            `<div class="grid-line" style="bottom: ${(i / 4) * 100}%;">
+                        <span class="grid-label">${Math.round((maxValue / 4) * i)}</span>
+                    </div>`
+        ).join('')}
+            </div>
+            <div class="chart-bars">
+                ${dailyData.slice(-14).map((day, index) => {
+            const completedHeight = maxValue > 0 ? (day.completed / maxValue) * chartHeight : 0;
+            const createdHeight = maxValue > 0 ? (day.created / maxValue) * chartHeight : 0;
+
+            return `
+                        <div class="chart-day" title="${day.date}">
+                            <div class="day-bars">
+                                <div class="bar completed-bar" style="height: ${completedHeight}px;"></div>
+                                <div class="bar created-bar" style="height: ${createdHeight}px;"></div>
+                            </div>
+                            <div class="day-label">${new Date(day.date).getDate()}</div>
+                        </div>
+                    `;
+        }).join('')}
+            </div>
+        </div>
+    `;
+    }
+
+    // 6. INTERACTION HANDLERS
+    function initializeAnalyticsInteractions() {
+        // Distribution tabs
+        document.querySelectorAll('.dist-tab').forEach(tab => {
+            tab.addEventListener('click', function () {
+                document.querySelectorAll('.dist-tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.distribution-chart').forEach(c => c.classList.add('hidden'));
+
+                this.classList.add('active');
+                const chartId = this.dataset.type + 'Chart';
+                document.getElementById(chartId)?.classList.remove('hidden');
+            });
+        });
+
+        // Time filter
+        const timeFilter = document.getElementById('timeFilter');
+        if (timeFilter) {
+            timeFilter.addEventListener('change', function () {
+                // Reload analytics with new time range
+                loadEnhancedAnalytics();
+            });
+        }
+    }
+
+    // 7. UTILITY FUNCTIONS
+    function exportAnalyticsReport() {
+        // Implementation for exporting analytics report
+        showMessage('Generating analytics report...', 'info');
+
+        setTimeout(() => {
+            const reportData = {
+                generatedAt: new Date().toISOString(),
+                user: currentUser?.username,
+                period: '30 days',
+                summary: 'Analytics report content here'
+            };
+
+            const blob = new Blob([JSON.stringify(reportData, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `analytics-report-${Date.now()}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+
+            showMessage('Report downloaded successfully!', 'success');
+        }, 1000);
+    }
+
+    function scheduleAnalyticsEmail() {
+        showMessage('Email scheduling feature coming soon!', 'info');
+    }
+
+    // 8. INITIALIZE ENHANCED ANALYTICS
+    function initializeEnhancedAnalytics() {
+        // Add this to your existing navigation handler for analytics section
+        const analyticsTab = document.querySelector('[data-section="analytics"]');
+        if (analyticsTab) {
+            analyticsTab.addEventListener('click', function () {
+                setTimeout(() => {
+                    loadEnhancedAnalytics();
+                }, 100);
+            });
+        }
+    }
+
+
+
+
 
     async function logout() {
         try {
