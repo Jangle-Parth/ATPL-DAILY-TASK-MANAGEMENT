@@ -6,8 +6,8 @@ document.addEventListener('DOMContentLoaded', function () {
     let tasks = [];
     let filteredTasks = [];
     let filteredJobs = [];
-    const API_URL = 'https://atpl-daily-task-management.onrender.com/api';
-    // const API_URL = 'http://localhost:3000/api';
+    // const API_URL = 'https://atpl-daily-task-management.onrender.com/api';
+    const API_URL = 'http://localhost:3000/api';
 
     // Check authentication
     checkAuth();
@@ -74,6 +74,30 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }, 100);
 
+    startAnalyticsUpdates();
+
+
+    // Add export button to analytics section if admin
+    setTimeout(() => {
+        const user = getCurrentUser();
+        if (user && (user.role === 'admin' || user.role === 'super-admin')) {
+            const analyticsSection = document.getElementById('analytics');
+            const sectionHeader = analyticsSection.querySelector('.section-header');
+
+            if (sectionHeader && !sectionHeader.querySelector('.export-analytics-btn')) {
+                const exportBtn = document.createElement('button');
+                exportBtn.className = 'btn btn-secondary export-analytics-btn';
+                exportBtn.innerHTML = '<i class="fas fa-download"></i> Export Report';
+                exportBtn.onclick = exportAnalyticsReport;
+
+                const actionButtons = sectionHeader.querySelector('.action-buttons');
+                if (actionButtons) {
+                    actionButtons.appendChild(exportBtn);
+                }
+            }
+        }
+    }, 1000);
+
     setTimeout(() => {
         // Job filter event listeners
         const applyJobFiltersBtn = document.getElementById('applyJobFilters');
@@ -104,6 +128,8 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
     }, 100);
+
+    setTimeout(makeDashboardStatsClickable, 500);
 
 
     function debounce(func, wait) {
@@ -218,12 +244,28 @@ document.addEventListener('DOMContentLoaded', function () {
             await Promise.all([
                 loadUsers(),
                 loadJobs(),
-                loadTasks()
+                loadTasks(),
+                loadUpcomingDueDates(),
+
             ]);
+            loadAdvancedAnalytics()
             updateDashboardStats();
         } catch (error) {
             showMessage('Error loading dashboard', 'error');
         }
+    }
+
+    function getCurrentUser() {
+        const userInfo = localStorage.getItem('atpl_user_info');
+        if (userInfo) {
+            try {
+                return JSON.parse(userInfo);
+            } catch (error) {
+                console.error('Error parsing user info:', error);
+                return null;
+            }
+        }
+        return null;
     }
 
     // Helper function to get auth headers
@@ -247,6 +289,69 @@ document.addEventListener('DOMContentLoaded', function () {
                 option.textContent = username;
                 userFilter.appendChild(option);
             });
+        }
+    }
+
+    function makeDashboardStatsClickable() {
+        // Add click handlers to stat cards
+        document.getElementById('totalUsers')?.parentElement?.parentElement?.addEventListener('click', () => {
+            switchToSection('users');
+        });
+
+        document.getElementById('totalJobs')?.parentElement?.parentElement?.addEventListener('click', () => {
+            switchToSection('jobs');
+        });
+
+        document.getElementById('activeTasks')?.parentElement?.parentElement?.addEventListener('click', () => {
+            switchToSection('tasks');
+            filterTasksByStatus('pending');
+        });
+
+        document.getElementById('pendingApprovals')?.parentElement?.parentElement?.addEventListener('click', () => {
+            switchToSection('tasks');
+            filterTasksByStatus('pending_approval');
+        });
+    }
+
+    function filterTasksByStatus(status) {
+        setTimeout(() => {
+            const statusFilter = document.getElementById('statusFilter');
+            if (statusFilter) {
+                statusFilter.value = status;
+                applyTaskFilters();
+            }
+        }, 100);
+    }
+
+    // Switch to specific section
+    function switchToSection(sectionName) {
+        const navButtons = document.querySelectorAll('.nav-btn');
+        const sections = document.querySelectorAll('.section');
+        const pageTitle = document.getElementById('pageTitle');
+
+        navButtons.forEach(btn => btn.classList.remove('active'));
+        sections.forEach(s => s.classList.remove('active'));
+
+        const targetButton = document.querySelector(`[data-section="${sectionName}"]`);
+        const targetSection = document.getElementById(sectionName);
+
+        if (targetButton && targetSection) {
+            targetButton.classList.add('active');
+            targetSection.classList.add('active');
+
+            const titles = {
+                dashboard: 'Dashboard Overview',
+                tasks: 'Task Management',
+                analytics: 'Analytics & Reports',
+                users: 'User Management',
+                jobs: 'Job Management'
+            };
+
+            if (pageTitle) {
+                pageTitle.textContent = titles[sectionName] || 'Dashboard';
+            }
+
+            loadSectionData(sectionName);
         }
     }
 
@@ -399,6 +504,309 @@ document.addEventListener('DOMContentLoaded', function () {
             resultInfo.style.display = 'none';
         }
     }
+
+    async function loadUpcomingDueDates() {
+        try {
+            // Since the due-dates endpoint doesn't exist, we'll calculate from tasks
+            if (!tasks || tasks.length === 0) {
+                console.log('No tasks available for due date calculation');
+                return;
+            }
+
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            const tomorrow = new Date(today);
+            tomorrow.setDate(today.getDate() + 1);
+
+            const thisWeek = new Date(today);
+            thisWeek.setDate(today.getDate() + 7);
+
+            // Calculate due dates from existing tasks
+            const dueDates = {
+                today: tasks.filter(task => {
+                    const taskDate = new Date(task.dueDate);
+                    taskDate.setHours(0, 0, 0, 0);
+                    return taskDate.getTime() === today.getTime() && task.status === 'pending';
+                }),
+                tomorrow: tasks.filter(task => {
+                    const taskDate = new Date(task.dueDate);
+                    taskDate.setHours(0, 0, 0, 0);
+                    return taskDate.getTime() === tomorrow.getTime() && task.status === 'pending';
+                }),
+                thisWeek: tasks.filter(task => {
+                    const taskDate = new Date(task.dueDate);
+                    return taskDate > tomorrow && taskDate <= thisWeek && task.status === 'pending';
+                }),
+                overdue: tasks.filter(task => {
+                    const taskDate = new Date(task.dueDate);
+                    return taskDate < today && task.status === 'pending';
+                })
+            };
+
+            renderUpcomingDueDates(dueDates);
+        } catch (error) {
+            console.error('Error loading due dates:', error);
+        }
+    }
+
+    // 3. UPDATE the renderUpcomingDueDates function to handle the new data structure
+    function renderUpcomingDueDates(dueDates) {
+        // Update due today section
+        const dueTodayElement = document.getElementById('dueToday');
+        const dueTodayContainer = document.querySelector('#dueTodayTasks');
+
+        if (dueTodayElement) {
+            dueTodayElement.textContent = dueDates.today ? dueDates.today.length : 0;
+        }
+
+        if (dueTodayContainer) {
+            dueTodayContainer.innerHTML = '';
+
+            if (dueDates.today && dueDates.today.length > 0) {
+                dueDates.today.forEach(task => {
+                    const taskElement = document.createElement('div');
+                    taskElement.className = 'task-item';
+                    taskElement.style.cssText = 'padding: 8px; border-left: 3px solid #ef4444; margin: 5px 0; background: #fef2f2; border-radius: 4px;';
+                    taskElement.innerHTML = `
+                    <div style="font-weight: 500; color: #dc2626;">${task.title}</div>
+                    <div style="font-size: 12px; color: #7f1d1d;">${task.description}</div>
+                    <div style="font-size: 11px; color: #991b1b; margin-top: 4px;">
+                        Priority: ${task.priority.toUpperCase()}
+                    </div>
+                `;
+                    dueTodayContainer.appendChild(taskElement);
+                });
+            } else {
+                dueTodayContainer.innerHTML = '<p style="color: #64748b; font-size: 14px; text-align: center; padding: 10px;">No tasks due today</p>';
+            }
+        }
+
+        // Update due tomorrow section
+        const dueTomorrowElement = document.getElementById('dueTomorrow');
+        const dueTomorrowContainer = document.querySelector('#dueTomorrowTasks');
+
+        if (dueTomorrowElement) {
+            dueTomorrowElement.textContent = dueDates.tomorrow ? dueDates.tomorrow.length : 0;
+        }
+
+        if (dueTomorrowContainer) {
+            dueTomorrowContainer.innerHTML = '';
+
+            if (dueDates.tomorrow && dueDates.tomorrow.length > 0) {
+                dueDates.tomorrow.forEach(task => {
+                    const taskElement = document.createElement('div');
+                    taskElement.className = 'task-item';
+                    taskElement.style.cssText = 'padding: 8px; border-left: 3px solid #f59e0b; margin: 5px 0; background: #fffbeb; border-radius: 4px;';
+                    taskElement.innerHTML = `
+                    <div style="font-weight: 500; color: #d97706;">${task.title}</div>
+                    <div style="font-size: 12px; color: #92400e;">${task.description}</div>
+                    <div style="font-size: 11px; color: #78350f; margin-top: 4px;">
+                        Priority: ${task.priority.toUpperCase()}
+                    </div>
+                `;
+                    dueTomorrowContainer.appendChild(taskElement);
+                });
+            } else {
+                dueTomorrowContainer.innerHTML = '<p style="color: #64748b; font-size: 14px; text-align: center; padding: 10px;">No tasks due tomorrow</p>';
+            }
+        }
+
+        // Update this week section
+        const dueThisWeekElement = document.getElementById('dueThisWeek');
+        const dueThisWeekContainer = document.querySelector('#dueThisWeekTasks');
+
+        if (dueThisWeekElement) {
+            dueThisWeekElement.textContent = dueDates.thisWeek ? dueDates.thisWeek.length : 0;
+        }
+
+        if (dueThisWeekContainer) {
+            dueThisWeekContainer.innerHTML = '';
+
+            if (dueDates.thisWeek && dueDates.thisWeek.length > 0) {
+                dueDates.thisWeek.forEach(task => {
+                    const taskElement = document.createElement('div');
+                    taskElement.className = 'task-item';
+                    taskElement.style.cssText = 'padding: 8px; border-left: 3px solid #3b82f6; margin: 5px 0; background: #eff6ff; border-radius: 4px;';
+                    taskElement.innerHTML = `
+                    <div style="font-weight: 500; color: #2563eb;">${task.title}</div>
+                    <div style="font-size: 12px; color: #1d4ed8;">${task.description}</div>
+                    <div style="font-size: 11px; color: #1e40af; margin-top: 4px;">
+                        Due: ${new Date(task.dueDate).toLocaleDateString()} | Priority: ${task.priority.toUpperCase()}
+                    </div>
+                `;
+                    dueThisWeekContainer.appendChild(taskElement);
+                });
+            } else {
+                dueThisWeekContainer.innerHTML = '<p style="color: #64748b; font-size: 14px; text-align: center; padding: 10px;">No tasks due this week</p>';
+            }
+        }
+
+        // Update overdue section
+        const overdueElement = document.getElementById('overdue');
+        const overdueContainer = document.querySelector('#overdueTasks');
+
+        if (overdueElement) {
+            overdueElement.textContent = dueDates.overdue ? dueDates.overdue.length : 0;
+        }
+
+        if (overdueContainer) {
+            overdueContainer.innerHTML = '';
+
+            if (dueDates.overdue && dueDates.overdue.length > 0) {
+                dueDates.overdue.forEach(task => {
+                    const taskElement = document.createElement('div');
+                    taskElement.className = 'task-item';
+                    taskElement.style.cssText = 'padding: 8px; border-left: 3px solid #dc2626; margin: 5px 0; background: #fef2f2; border-radius: 4px;';
+                    taskElement.innerHTML = `
+                    <div style="font-weight: 500; color: #dc2626;">${task.title}</div>
+                    <div style="font-size: 12px; color: #7f1d1d;">${task.description}</div>
+                    <div style="font-size: 11px; color: #991b1b; margin-top: 4px;">
+                        Overdue by: ${Math.ceil((new Date() - new Date(task.dueDate)) / (1000 * 60 * 60 * 24))} days | Priority: ${task.priority.toUpperCase()}
+                    </div>
+                `;
+                    overdueContainer.appendChild(taskElement);
+                });
+            } else {
+                overdueContainer.innerHTML = '<p style="color: #64748b; font-size: 14px; text-align: center; padding: 10px;">No overdue tasks</p>';
+            }
+        }
+    }
+
+    function createClickableDueTaskItem(task, category) {
+        const taskItem = document.createElement('div');
+        taskItem.className = 'due-task-item';
+        taskItem.style.cssText = `
+        padding: 8px;
+        margin-bottom: 6px;
+        background: ${category === 'today' ? '#fef2f2' : '#fefbf0'};
+        border-radius: 6px;
+        border-left: 3px solid ${category === 'today' ? '#ef4444' : '#f59e0b'};
+        cursor: pointer;
+        transition: all 0.2s ease;
+    `;
+
+        const assigneeName = Array.isArray(task.assignedTo)
+            ? task.assignedTo.map(u => u.username).join(', ')
+            : (task.assignedTo?.username || 'Unknown');
+
+        taskItem.innerHTML = `
+        <div style="font-weight: 600; font-size: 0.8rem; margin-bottom: 2px; color: #1e293b;">
+            ${task.title}
+        </div>
+        <div style="font-size: 0.7rem; color: #64748b; margin-bottom: 2px;">
+            Assigned to: ${assigneeName}
+        </div>
+        <div style="font-size: 0.7rem; color: ${category === 'today' ? '#ef4444' : '#f59e0b'}; font-weight: 600;">
+            ${task.priority.toUpperCase()} • ${task.type.toUpperCase()}
+        </div>
+    `;
+
+        taskItem.addEventListener('mouseenter', () => {
+            taskItem.style.transform = 'translateX(4px)';
+            taskItem.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
+        });
+
+        taskItem.addEventListener('mouseleave', () => {
+            taskItem.style.transform = 'translateX(0)';
+            taskItem.style.boxShadow = 'none';
+        });
+
+        taskItem.addEventListener('click', () => {
+            openTaskModal(task);
+        });
+
+        return taskItem;
+    }
+
+    function openTaskModal(task) {
+        // Create task details modal
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.style.display = 'block';
+
+        const isOverdue = new Date() > new Date(task.dueDate) && task.status === 'pending';
+        const canApprove = task.status === 'pending_approval';
+
+        modal.innerHTML = `
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h3 class="modal-title">Task Details</h3>
+                <button class="close-btn" onclick="this.closest('.modal').remove()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div style="padding: 0 0 20px 0;">
+                <div style="background: ${isOverdue ? '#fef2f2' : '#f8fafc'}; padding: 15px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid ${isOverdue ? '#ef4444' : '#3b82f6'};">
+                    <h4 style="margin: 0 0 8px 0; color: #1e293b;">${task.title}</h4>
+                    <p style="margin: 0 0 10px 0; color: #64748b; line-height: 1.4;">${task.description}</p>
+                    <div style="display: flex; gap: 15px; font-size: 0.8rem; color: #64748b;">
+                        <span><strong>Priority:</strong> ${task.priority.toUpperCase()}</span>
+                        <span><strong>Type:</strong> ${task.type.toUpperCase()}</span>
+                        <span><strong>Status:</strong> ${task.status.replace('_', ' ').toUpperCase()}</span>
+                    </div>
+                </div>
+                
+                ${task.jobDetails ? `
+                    <div style="background: #eff6ff; padding: 12px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #3b82f6;">
+                        <h5 style="margin: 0 0 6px 0; color: #1e40af;">📋 Job Details</h5>
+                        <div style="font-size: 0.85rem; color: #1e40af;">
+                            <div><strong>Doc No:</strong> ${task.jobDetails.docNo}</div>
+                            <div><strong>Customer:</strong> ${task.jobDetails.customerName}</div>
+                            <div><strong>Item Code:</strong> ${task.jobDetails.itemCode}</div>
+                            <div><strong>Quantity:</strong> ${task.jobDetails.qty}</div>
+                            ${task.jobDetails.description ? `<div><strong>Description:</strong> ${task.jobDetails.description}</div>` : ''}
+                        </div>
+                    </div>
+                ` : ''}
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                    <div>
+                        <strong style="color: #374151;">Due Date:</strong><br>
+                        <span style="color: ${isOverdue ? '#ef4444' : '#64748b'}; font-weight: ${isOverdue ? '600' : 'normal'};">
+                            ${new Date(task.dueDate).toLocaleDateString()}
+                            ${isOverdue ? ' (OVERDUE)' : ''}
+                        </span>
+                    </div>
+                    <div>
+                        <strong style="color: #374151;">Assigned To:</strong><br>
+                        <span style="color: #64748b;">
+                            ${Array.isArray(task.assignedTo)
+                ? task.assignedTo.map(u => u.username).join(', ')
+                : (task.assignedTo?.username || 'Unknown')}
+                        </span>
+                    </div>
+                </div>
+                
+                ${task.completionRemarks ? `
+                    <div style="background: #f0fdf4; padding: 12px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #10b981;">
+                        <strong style="color: #065f46;">Completion Remarks:</strong><br>
+                        <span style="color: #166534;">${task.completionRemarks}</span>
+                    </div>
+                ` : ''}
+                
+                <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                    ${canApprove ? `
+                        <button onclick="approveTaskFromModal('${task._id}')" style="background: #10b981; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 600;">
+                            ✓ Approve
+                        </button>
+                        <button onclick="rejectTaskFromModal('${task._id}')" style="background: #ef4444; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 600;">
+                            ✗ Reject
+                        </button>
+                    ` : ''}
+                    <button onclick="this.closest('.modal').remove()" style="background: #6b7280; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 600;">
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+
+        document.body.appendChild(modal);
+    }
+
+
+
 
     async function loadUsers() {
         try {
@@ -953,6 +1361,1317 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    async function loadAdvancedAnalytics() {
+        try {
+            const [comprehensive, leaderboard] = await Promise.all([
+                fetch(`${API_URL}/analytics/comprehensive?period=30`, {
+                    headers: getAuthHeaders()
+                }).then(r => r.json()),
+                fetch(`${API_URL}/analytics/leaderboard`, {
+                    headers: getAuthHeaders()
+                }).then(r => r.json())
+            ]);
+
+            renderComprehensiveAnalytics(comprehensive);
+            renderLeaderboard(leaderboard);
+        } catch (error) {
+            console.error('Error loading advanced analytics:', error);
+        }
+    }
+
+    function renderComprehensiveAnalytics(data) {
+        const analyticsSection = document.getElementById('analytics');
+
+        // Clear existing content
+        const existingOverview = analyticsSection.querySelector('.analytics-overview');
+        if (existingOverview) {
+            existingOverview.innerHTML = '';
+        }
+
+        // Create comprehensive analytics dashboard
+        const analyticsContainer = document.createElement('div');
+        analyticsContainer.className = 'comprehensive-analytics';
+        analyticsContainer.innerHTML = `
+        <!-- Performance Summary -->
+        <div class="analytics-grid" style="margin-bottom: 2rem;">
+            <div class="analytics-card performance-summary">
+                <h3><i class="fas fa-chart-line"></i> Performance Summary</h3>
+                <div class="performance-metrics">
+                    <div class="metric-row">
+                        <span class="metric-label">Total Tasks (${data.summary.period})</span>
+                        <span class="metric-value">${data.summary.totalTasks}</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Completion Rate</span>
+                        <span class="metric-value">${data.performance.completionRate}%</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">On-Time Delivery</span>
+                        <span class="metric-value">${data.performance.onTimeDeliveryRate}%</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Task Velocity</span>
+                        <span class="metric-value">${data.performance.taskVelocity} tasks/day</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Avg Completion Time</span>
+                        <span class="metric-value">${data.performance.averageCompletionTime} days</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="analytics-card risk-analysis">
+                <h3><i class="fas fa-exclamation-triangle"></i> Risk Analysis</h3>
+                <div class="risk-metrics">
+                    <div class="risk-item ${data.riskAnalysis.overdueTasks.length > 5 ? 'high-risk' : data.riskAnalysis.overdueTasks.length > 2 ? 'medium-risk' : 'low-risk'}">
+                        <div class="risk-icon">⚠️</div>
+                        <div class="risk-info">
+                            <div class="risk-title">Overdue Tasks</div>
+                            <div class="risk-value">${data.riskAnalysis.overdueTasks.length}</div>
+                        </div>
+                    </div>
+                    <div class="risk-item ${data.riskAnalysis.upcomingDeadlines.length > 10 ? 'high-risk' : data.riskAnalysis.upcomingDeadlines.length > 5 ? 'medium-risk' : 'low-risk'}">
+                        <div class="risk-icon">📅</div>
+                        <div class="risk-info">
+                            <div class="risk-title">Due in 3 Days</div>
+                            <div class="risk-value">${data.riskAnalysis.upcomingDeadlines.length}</div>
+                        </div>
+                    </div>
+                    <div class="risk-item ${data.riskAnalysis.bottlenecks.length > 3 ? 'high-risk' : data.riskAnalysis.bottlenecks.length > 1 ? 'medium-risk' : 'low-risk'}">
+                        <div class="risk-icon">🚧</div>
+                        <div class="risk-info">
+                            <div class="risk-title">Bottlenecks</div>
+                            <div class="risk-value">${data.riskAnalysis.bottlenecks.length}</div>
+                        </div>
+                    </div>
+                </div>
+                ${data.riskAnalysis.bottlenecks.length > 0 ? `
+                    <div class="bottlenecks-list" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #e5e7eb;">
+                        <h5 style="margin-bottom: 0.5rem; color: #ef4444;">⚠️ Identified Bottlenecks:</h5>
+                        ${data.riskAnalysis.bottlenecks.map(bottleneck => `
+                            <div class="bottleneck-item" style="padding: 0.5rem; background: #fef2f2; border-radius: 4px; margin-bottom: 0.5rem; border-left: 3px solid #ef4444;">
+                                <strong>${bottleneck.type === 'user_overload' ? '👤 User Overload' : '⚙️ Stage Delay'}:</strong>
+                                ${bottleneck.type === 'user_overload' ?
+                `${bottleneck.pendingTasks} pending tasks` :
+                `${bottleneck.stage} (${bottleneck.averageDays} days avg)`
+            }
+                                <span class="severity ${bottleneck.severity}" style="float: right; font-size: 0.8rem; font-weight: 600; color: ${bottleneck.severity === 'high' ? '#dc2626' : '#f59e0b'};">
+                                    ${bottleneck.severity.toUpperCase()}
+                                </span>
+                            </div>
+                        `).join('')}
+                    </div>
+                ` : ''}
+            </div>
+
+            <div class="analytics-card forecasting">
+                <h3><i class="fas fa-crystal-ball"></i> Forecasting</h3>
+                <div class="forecast-metrics">
+                    <div class="forecast-item">
+                        <div class="forecast-icon">📈</div>
+                        <div class="forecast-info">
+                            <div class="forecast-title">Next Week Completions</div>
+                            <div class="forecast-value">${data.forecasting.projectedCompletions.nextWeek}</div>
+                        </div>
+                    </div>
+                    <div class="forecast-item">
+                        <div class="forecast-icon">📊</div>
+                        <div class="forecast-info">
+                            <div class="forecast-title">Next Month Completions</div>
+                            <div class="forecast-value">${data.forecasting.projectedCompletions.nextMonth}</div>
+                        </div>
+                    </div>
+                    <div class="forecast-item">
+                        <div class="forecast-icon">⏱️</div>
+                        <div class="forecast-info">
+                            <div class="forecast-title">Avg Completion Time</div>
+                            <div class="forecast-value">${data.forecasting.projectedCompletions.avgCompletionTime}</div>
+                        </div>
+                    </div>
+                </div>
+                <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #e5e7eb;">
+                    <h5 style="margin-bottom: 0.5rem; color: #3b82f6;">💡 Capacity Analysis:</h5>
+                    <div style="background: #eff6ff; padding: 0.75rem; border-radius: 6px; border-left: 3px solid #3b82f6;">
+                        <div style="font-size: 0.9rem; line-height: 1.4;">
+                            <strong>Utilization:</strong> ${data.forecasting.capacityAnalysis.utilizationRate}%<br>
+                            <strong>Avg Tasks/User:</strong> ${data.forecasting.capacityAnalysis.averageTasksPerUser}<br>
+                            <strong>Recommendation:</strong> ${data.forecasting.capacityAnalysis.recommendation}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Department Performance -->
+        <div class="analytics-grid" style="margin-bottom: 2rem;">
+            <div class="analytics-card department-performance" style="grid-column: span 2;">
+                <h3><i class="fas fa-building"></i> Department Performance</h3>
+                <div class="department-grid">
+                    ${Object.entries(data.departmentAnalytics || {}).map(([dept, analytics]) => `
+                        <div class="department-card">
+                            <div class="department-header">
+                                <h4>${dept}</h4>
+                                <span class="user-count">${analytics.users} users</span>
+                            </div>
+                            <div class="department-metrics">
+                                <div class="dept-metric">
+                                    <span class="dept-label">Total Tasks</span>
+                                    <span class="dept-value">${analytics.totalTasks}</span>
+                                </div>
+                                <div class="dept-metric">
+                                    <span class="dept-label">Completion Rate</span>
+                                    <span class="dept-value">${analytics.completionRate}%</span>
+                                </div>
+                                <div class="dept-metric">
+                                    <span class="dept-label">Overdue</span>
+                                    <span class="dept-value ${analytics.overdueTasks > 5 ? 'high-risk' : ''}">${analytics.overdueTasks}</span>
+                                </div>
+                                <div class="dept-metric">
+                                    <span class="dept-label">Avg Time</span>
+                                    <span class="dept-value">${analytics.averageCompletionTime}d</span>
+                                </div>
+                            </div>
+                            <div class="department-progress">
+                                <div class="progress-bar">
+                                    <div class="progress-fill" style="width: ${analytics.completionRate}%; background: ${analytics.completionRate > 80 ? '#10b981' : analytics.completionRate > 60 ? '#f59e0b' : '#ef4444'};"></div>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        </div>
+
+        <!-- Trends and Distributions -->
+        <div class="analytics-grid" style="margin-bottom: 2rem;">
+            <div class="analytics-card trends-chart">
+                <h3><i class="fas fa-chart-area"></i> Daily Trends</h3>
+                <div class="trends-container">
+                    ${renderTrendsChart(data.trends.daily)}
+                </div>
+            </div>
+
+            <div class="analytics-card distribution-chart">
+                <h3><i class="fas fa-chart-pie"></i> Task Distribution</h3>
+                <div class="distribution-container">
+                    <div class="distribution-section">
+                        <h5>By Priority</h5>
+                        ${renderDistributionChart(data.distributions.tasksByPriority, 'priority')}
+                    </div>
+                    <div class="distribution-section">
+                        <h5>By Type</h5>
+                        ${renderDistributionChart(data.distributions.tasksByType, 'type')}
+                    </div>
+                    <div class="distribution-section">
+                        <h5>By Status</h5>
+                        ${renderDistributionChart(data.distributions.tasksByStatus, 'status')}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Top Performers -->
+        <div class="analytics-grid">
+            <div class="analytics-card top-performers" style="grid-column: span 2;">
+                <h3><i class="fas fa-trophy"></i> Top Performers</h3>
+                <div class="performers-list">
+                    ${(data.topPerformers || []).slice(0, 10).map((performer, index) => `
+                        <div class="performer-item ${index < 3 ? `rank-${index + 1}` : ''}">
+                            <div class="performer-rank">
+                                ${index + 1 <= 3 ?
+                    ['🥇', '🥈', '🥉'][index] :
+                    `#${index + 1}`
+                }
+                            </div>
+                            <div class="performer-info">
+                                <div class="performer-name">${performer.user.username}</div>
+                                <div class="performer-dept">${performer.user.department}</div>
+                            </div>
+                            <div class="performer-metrics">
+                                <div class="performer-stat">
+                                    <span class="stat-label">Completion</span>
+                                    <span class="stat-value">${performer.completionRate}%</span>
+                                </div>
+                                <div class="performer-stat">
+                                    <span class="stat-label">On-Time</span>
+                                    <span class="stat-value">${performer.onTimeRate}%</span>
+                                </div>
+                                <div class="performer-stat">
+                                    <span class="stat-label">Total</span>
+                                    <span class="stat-value">${performer.total}</span>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        </div>
+    `;
+
+        // Insert into analytics section
+        if (existingOverview) {
+            existingOverview.appendChild(analyticsContainer);
+        } else {
+            const newOverview = document.createElement('div');
+            newOverview.className = 'analytics-overview';
+            newOverview.appendChild(analyticsContainer);
+            analyticsSection.appendChild(newOverview);
+        }
+
+        // Add CSS for enhanced analytics
+        addAdvancedAnalyticsCSS();
+    }
+
+    function renderTrendsChart(dailyData) {
+        const dates = Object.keys(dailyData).slice(-7); // Last 7 days
+        const maxValue = Math.max(...dates.map(date => Math.max(dailyData[date].created, dailyData[date].completed)));
+
+        return `
+        <div class="trends-chart">
+            ${dates.map(date => {
+            const data = dailyData[date];
+            const createdHeight = (data.created / maxValue) * 100;
+            const completedHeight = (data.completed / maxValue) * 100;
+
+            return `
+                    <div class="trend-day">
+                        <div class="trend-bars">
+                            <div class="trend-bar created" style="height: ${createdHeight}%" title="Created: ${data.created}"></div>
+                            <div class="trend-bar completed" style="height: ${completedHeight}%" title="Completed: ${data.completed}"></div>
+                        </div>
+                        <div class="trend-label">${new Date(date).toLocaleDateString('en-US', { weekday: 'short' })}</div>
+                    </div>
+                `;
+        }).join('')}
+        </div>
+        <div class="trend-legend">
+            <div class="legend-item">
+                <div class="legend-color created"></div>
+                <span>Created</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color completed"></div>
+                <span>Completed</span>
+            </div>
+        </div>
+    `;
+    }
+
+    function renderDistributionChart(data, type) {
+        const total = Object.values(data).reduce((sum, val) => sum + val, 0);
+        const colors = {
+            priority: { low: '#10b981', medium: '#f59e0b', high: '#ef4444', urgent: '#dc2626' },
+            type: { 'job-auto': '#3b82f6', admin: '#8b5cf6', user: '#06b6d4', manual: '#84cc16', 'super-admin': '#f59e0b' },
+            status: { pending: '#f59e0b', pending_approval: '#3b82f6', completed: '#10b981', rejected: '#ef4444' }
+        };
+
+        return `
+        <div class="distribution-items">
+            ${Object.entries(data).map(([key, value]) => {
+            const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+            const color = colors[type]?.[key] || '#64748b';
+
+            return `
+                    <div class="distribution-item">
+                        <div class="item-info">
+                            <div class="item-color" style="background-color: ${color};"></div>
+                            <span class="item-label">${key}</span>
+                        </div>
+                        <div class="item-stats">
+                            <span class="item-count">${value}</span>
+                            <span class="item-percentage">${percentage}%</span>
+                        </div>
+                    </div>
+                `;
+        }).join('')}
+        </div>
+    `;
+    }
+
+    function addAdvancedAnalyticsCSS() {
+        if (document.getElementById('advanced-analytics-css')) return;
+
+        const style = document.createElement('style');
+        style.id = 'advanced-analytics-css';
+        style.textContent = `
+        .comprehensive-analytics {
+            max-width: 100%;
+        }
+        
+        .analytics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 1.5rem;
+        }
+        
+        .analytics-card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
+            border: 1px solid #e5e7eb;
+        }
+        
+        .analytics-card h3 {
+            margin: 0 0 1rem 0;
+            color: #1e293b;
+            font-size: 1.1rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .performance-metrics, .risk-metrics, .forecast-metrics {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+        
+        .metric-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #f1f5f9;
+        }
+        
+        .metric-row:last-child {
+            border-bottom: none;
+        }
+        
+        .metric-label {
+            font-weight: 500;
+            color: #64748b;
+        }
+        
+        .metric-value {
+            font-weight: 700;
+            color: #1e293b;
+        }
+        
+        .risk-item, .forecast-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem;
+            border-radius: 8px;
+            background: #f8fafc;
+        }
+        
+        .risk-item.high-risk {
+            background: #fef2f2;
+            border-left: 3px solid #ef4444;
+        }
+        
+        .risk-item.medium-risk {
+            background: #fefbf0;
+            border-left: 3px solid #f59e0b;
+        }
+        
+        .risk-item.low-risk {
+            background: #f0fdf4;
+            border-left: 3px solid #10b981;
+        }
+        
+        .risk-icon, .forecast-icon {
+            font-size: 1.5rem;
+        }
+        
+        .risk-title, .forecast-title {
+            font-weight: 600;
+            color: #374151;
+            font-size: 0.9rem;
+        }
+        
+        .risk-value, .forecast-value {
+            font-weight: 700;
+            color: #1e293b;
+            font-size: 1.1rem;
+        }
+        
+        .department-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+        }
+        
+        .department-card {
+            background: #f8fafc;
+            border-radius: 8px;
+            padding: 1rem;
+            border: 1px solid #e2e8f0;
+        }
+        
+        .department-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.75rem;
+        }
+        
+        .department-header h4 {
+            margin: 0;
+            color: #1e293b;
+            font-size: 1rem;
+        }
+        
+        .user-count {
+            background: #e2e8f0;
+            color: #475569;
+            padding: 0.25rem 0.5rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        
+        .department-metrics {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.5rem;
+            margin-bottom: 0.75rem;
+        }
+        
+        .dept-metric {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+        
+        .dept-label {
+            font-size: 0.75rem;
+            color: #64748b;
+            font-weight: 500;
+        }
+        
+        .dept-value {
+            font-weight: 700;
+            color: #1e293b;
+        }
+        
+        .dept-value.high-risk {
+            color: #ef4444;
+        }
+        
+        .department-progress {
+            margin-top: 0.75rem;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: #e2e8f0;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            transition: width 0.3s ease;
+        }
+        
+        .trends-chart {
+            display: flex;
+            align-items: end;
+            justify-content: space-between;
+            height: 200px;
+            padding: 1rem;
+            background: #f8fafc;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+        
+        .trend-day {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5rem;
+            flex: 1;
+        }
+        
+        .trend-bars {
+            display: flex;
+            align-items: end;
+            gap: 2px;
+            height: 150px;
+        }
+        
+        .trend-bar {
+            width: 12px;
+            border-radius: 2px 2px 0 0;
+            transition: height 0.3s ease;
+        }
+        
+        .trend-bar.created {
+            background: #3b82f6;
+        }
+        
+        .trend-bar.completed {
+            background: #10b981;
+        }
+        
+        .trend-label {
+            font-size: 0.75rem;
+            color: #64748b;
+            font-weight: 500;
+        }
+        
+        .trend-legend {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.8rem;
+            color: #64748b;
+        }
+        
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 2px;
+        }
+        
+        .legend-color.created {
+            background: #3b82f6;
+        }
+        
+        .legend-color.completed {
+            background: #10b981;
+        }
+        
+        .distribution-section {
+            margin-bottom: 1.5rem;
+        }
+        
+        .distribution-section h5 {
+            margin: 0 0 0.75rem 0;
+            color: #374151;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+        
+        .distribution-items {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        
+        .distribution-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem;
+            background: #f8fafc;
+            border-radius: 6px;
+        }
+        
+        .item-info {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .item-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 2px;
+        }
+        
+        .item-label {
+            font-size: 0.85rem;
+            color: #374151;
+            font-weight: 500;
+            text-transform: capitalize;
+        }
+        
+        .item-stats {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .item-count {
+            font-weight: 700;
+            color: #1e293b;
+        }
+        
+        .item-percentage {
+            font-size: 0.8rem;
+            color: #64748b;
+        }
+        
+        .performers-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+        
+        .performer-item {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1rem;
+            background: #f8fafc;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+        }
+        
+        .performer-item.rank-1 {
+            background: linear-gradient(135deg, #fef3c7, #fde68a);
+            border-color: #f59e0b;
+        }
+        
+        .performer-item.rank-2 {
+            background: linear-gradient(135deg, #e5e7eb, #d1d5db);
+            border-color: #9ca3af;
+        }
+        
+        .performer-item.rank-3 {
+            background: linear-gradient(135deg, #fecaca, #fca5a5);
+            border-color: #f87171;
+        }
+        
+        .performer-rank {
+            font-size: 1.5rem;
+            font-weight: 700;
+            min-width: 40px;
+            text-align: center;
+        }
+        
+        .performer-info {
+            flex: 1;
+        }
+        
+        .performer-name {
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 0.25rem;
+        }
+        
+        .performer-dept {
+            font-size: 0.8rem;
+            color: #64748b;
+        }
+        
+        .performer-metrics {
+            display: flex;
+            gap: 1rem;
+        }
+        
+        .performer-stat {
+            text-align: center;
+        }
+        
+        .stat-label {
+            display: block;
+            font-size: 0.7rem;
+            color: #64748b;
+            margin-bottom: 0.25rem;
+        }
+        
+        .stat-value {
+            font-weight: 700;
+            color: #1e293b;
+        }
+        
+        @media (max-width: 768px) {
+            .analytics-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .department-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .performer-metrics {
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+            
+            .trend-bars {
+                gap: 1px;
+            }
+            
+            .trend-bar {
+                width: 8px;
+            }
+        }
+    `;
+
+        document.head.appendChild(style);
+    }
+
+    // User Analytics (simplified version for user dashboard)
+    async function loadUserAnalytics() {
+        try {
+            const response = await fetch(`${API_URL}/analytics/comprehensive?period=30`, {
+                headers: getAuthHeaders()
+            });
+
+            const data = await response.json();
+            renderUserAnalytics(data);
+        } catch (error) {
+            console.error('Error loading user analytics:', error);
+        }
+    }
+
+    function renderUserAnalytics(data) {
+        const analyticsSection = document.getElementById('analytics');
+        const existingOverview = analyticsSection.querySelector('.analytics-overview');
+
+        if (existingOverview) {
+            existingOverview.innerHTML = `
+            <!-- Personal Performance Summary -->
+            <div class="analytics-card" style="grid-column: span 2;">
+                <h3><i class="fas fa-user-chart"></i> My Performance Summary</h3>
+                <div class="user-performance-grid">
+                    <div class="performance-metric">
+                        <div class="metric-icon" style="background: #3b82f6;">📊</div>
+                        <div class="metric-info">
+                            <div class="metric-title">Total Tasks</div>
+                            <div class="metric-number">${data.summary.totalTasks}</div>
+                            <div class="metric-subtitle">${data.summary.period}</div>
+                        </div>
+                    </div>
+                    <div class="performance-metric">
+                        <div class="metric-icon" style="background: #10b981;">✅</div>
+                        <div class="metric-info">
+                            <div class="metric-title">Completion Rate</div>
+                            <div class="metric-number">${data.performance.completionRate}%</div>
+                            <div class="metric-subtitle">Above avg: ${parseFloat(data.performance.completionRate) > 75 ? '👍' : '👎'}</div>
+                        </div>
+                    </div>
+                    <div class="performance-metric">
+                        <div class="metric-icon" style="background: #f59e0b;">⏱️</div>
+                        <div class="metric-info">
+                            <div class="metric-title">Avg Completion</div>
+                            <div class="metric-number">${data.performance.averageCompletionTime}</div>
+                            <div class="metric-subtitle">days</div>
+                        </div>
+                    </div>
+                    <div class="performance-metric">
+                        <div class="metric-icon" style="background: #8b5cf6;">🎯</div>
+                        <div class="metric-info">
+                            <div class="metric-title">On-Time Rate</div>
+                            <div class="metric-number">${data.performance.onTimeDeliveryRate}%</div>
+                            <div class="metric-subtitle">Punctuality</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- My Task Breakdown -->
+            <div class="analytics-card">
+                <h3><i class="fas fa-chart-pie"></i> My Task Breakdown</h3>
+                <div class="breakdown-container">
+                    <div class="breakdown-section">
+                        <h5>By Priority</h5>
+                        ${renderDistributionChart(data.distributions.tasksByPriority, 'priority')}
+                    </div>
+                    <div class="breakdown-section">
+                        <h5>By Type</h5>
+                        ${renderDistributionChart(data.distributions.tasksByType, 'type')}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Personal Trends -->
+            <div class="analytics-card">
+                <h3><i class="fas fa-chart-line"></i> My Activity Trends</h3>
+                <div class="trends-container">
+                    ${renderTrendsChart(data.trends.daily)}
+                </div>
+                ${data.performance.streak ? `
+                    <div class="streak-info" style="margin-top: 1rem; padding: 1rem; background: #f0fdf4; border-radius: 8px; border-left: 4px solid #10b981;">
+                        <strong>🔥 Current Streak: ${data.performance.streak} days</strong>
+                        <p style="margin: 0.5rem 0 0 0; color: #065f46; font-size: 0.9rem;">Keep up the great work!</p>
+                    </div>
+                ` : ''}
+            </div>
+        `;
+        }
+
+        // Add user-specific CSS
+        addUserAnalyticsCSS();
+    }
+
+    function addUserAnalyticsCSS() {
+        if (document.getElementById('user-analytics-css')) return;
+
+        const style = document.createElement('style');
+        style.id = 'user-analytics-css';
+        style.textContent = `
+        .user-performance-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+        
+        .performance-metric {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1rem;
+            background: #f8fafc;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+        }
+        
+        .metric-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            color: white;
+        }
+        
+        .metric-info {
+            flex: 1;
+        }
+        
+        .metric-title {
+            font-size: 0.8rem;
+            color: #64748b;
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+        
+        .metric-number {
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: #1e293b;
+            margin-bottom: 0.25rem;
+        }
+        
+        .metric-subtitle {
+            font-size: 0.75rem;
+            color: #64748b;
+        }
+        
+        .breakdown-container {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+        
+        .breakdown-section h5 {
+            margin: 0 0 0.75rem 0;
+            color: #374151;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+        
+        .streak-info {
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.8; }
+        }
+        
+        @media (max-width: 768px) {
+            .user-performance-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .performance-metric {
+                flex-direction: column;
+                text-align: center;
+                gap: 0.5rem;
+            }
+        }
+    `;
+
+        document.head.appendChild(style);
+    }
+
+    // Load analytics based on user role
+    function loadAnalytics() {
+        const user = getCurrentUser();
+        if (user && (user.role === 'admin' || user.role === 'super-admin')) {
+            loadAdvancedAnalytics();
+        } else {
+            loadUserAnalytics();
+        }
+    }
+
+    // Enhanced section loading with analytics
+    function loadSectionData(section) {
+        switch (section) {
+            case 'dashboard':
+                updateDashboardStats();
+                loadUpcomingDueDates();
+                break;
+            case 'users':
+                loadUsers();
+                break;
+            case 'jobs':
+                loadJobs();
+                break;
+            case 'tasks':
+                loadTasks();
+                setTimeout(() => {
+                    addTaskFilters();
+                }, 100);
+                break;
+            case 'analytics':
+                loadAnalytics(); // Use the new enhanced analytics
+                break;
+        }
+    }
+
+    // Export functionality for analytics
+    async function exportAnalyticsReport() {
+        try {
+            const response = await fetch(`${API_URL}/analytics/comprehensive?period=30`, {
+                headers: getAuthHeaders()
+            });
+
+            const data = await response.json();
+
+            // Create detailed report
+            const report = {
+                generatedAt: new Date().toISOString(),
+                period: data.summary.period,
+                summary: data.summary,
+                performance: data.performance,
+                riskAnalysis: data.riskAnalysis,
+                departmentAnalytics: data.departmentAnalytics,
+                topPerformers: data.topPerformers,
+                forecasting: data.forecasting
+            };
+
+            // Download as JSON
+            const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `analytics-report-${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            showMessage('Analytics report exported successfully', 'success');
+        } catch (error) {
+            console.error('Error exporting analytics:', error);
+            showMessage('Error exporting analytics report', 'error');
+        }
+    }
+
+    // Real-time analytics updates
+    function startAnalyticsUpdates() {
+        // Update analytics every 5 minutes
+        setInterval(() => {
+            const activeSection = document.querySelector('.section.active');
+            if (activeSection && activeSection.id === 'analytics') {
+                loadAnalytics();
+            }
+        }, 300000); // 5 minutes
+    }
+
+
+    // Performance monitoring and alerts
+    function monitorPerformance(data) {
+        const alerts = [];
+
+        // Check completion rate
+        if (parseFloat(data.performance.completionRate) < 60) {
+            alerts.push({
+                type: 'warning',
+                title: 'Low Completion Rate',
+                message: `Current completion rate is ${data.performance.completionRate}%. Consider reviewing task assignments.`
+            });
+        }
+
+        // Check overdue tasks
+        if (data.riskAnalysis.overdueTasks.length > 5) {
+            alerts.push({
+                type: 'error',
+                title: 'High Overdue Tasks',
+                message: `${data.riskAnalysis.overdueTasks.length} tasks are overdue. Immediate attention required.`
+            });
+        }
+
+        // Check bottlenecks
+        if (data.riskAnalysis.bottlenecks.length > 0) {
+            const highSeverityBottlenecks = data.riskAnalysis.bottlenecks.filter(b => b.severity === 'high');
+            if (highSeverityBottlenecks.length > 0) {
+                alerts.push({
+                    type: 'error',
+                    title: 'Critical Bottlenecks',
+                    message: `${highSeverityBottlenecks.length} critical bottlenecks detected. Review workload distribution.`
+                });
+            }
+        }
+
+        // Show alerts
+        alerts.forEach(alert => {
+            showMessage(alert.message, alert.type === 'error' ? 'error' : 'warning');
+        });
+
+        return alerts;
+    }
+
+
+    // Enhanced leaderboard rendering
+    function renderLeaderboard(leaderboard) {
+        const leaderboardContainer = document.createElement('div');
+        leaderboardContainer.className = 'leaderboard-section';
+        leaderboardContainer.innerHTML = `
+        <div class="analytics-card leaderboard-card" style="grid-column: span 2;">
+            <h3><i class="fas fa-crown"></i> Team Leaderboard</h3>
+            <div class="leaderboard-controls">
+                <div class="leaderboard-filters">
+                    <select id="leaderboardPeriod" onchange="updateLeaderboard()">
+                        <option value="30">Last 30 Days</option>
+                        <option value="7">Last 7 Days</option>
+                        <option value="90">Last 3 Months</option>
+                    </select>
+                    <select id="leaderboardMetric" onchange="updateLeaderboard()">
+                        <option value="completion">Completion Rate</option>
+                        <option value="ontime">On-Time Rate</option>
+                        <option value="total">Total Tasks</option>
+                    </select>
+                </div>
+            </div>
+            <div class="leaderboard-list">
+                ${leaderboard.slice(0, 15).map((user, index) => `
+                    <div class="leaderboard-item ${index < 3 ? `top-${index + 1}` : ''}">
+                        <div class="rank-badge">
+                            ${index < 3 ? ['🥇', '🥈', '🥉'][index] : `#${index + 1}`}
+                        </div>
+                        <div class="user-avatar-small" style="background: linear-gradient(135deg, #${Math.floor(Math.random() * 16777215).toString(16)}, #${Math.floor(Math.random() * 16777215).toString(16)});">
+                            ${user.user.username.charAt(0).toUpperCase()}
+                        </div>
+                        <div class="user-details">
+                            <div class="user-name">${user.user.username}</div>
+                            <div class="user-department">${user.user.department}</div>
+                        </div>
+                        <div class="user-stats">
+                            <div class="stat-item">
+                                <span class="stat-label">Completion</span>
+                                <span class="stat-value">${user.metrics.completionRate}%</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">On-Time</span>
+                                <span class="stat-value">${user.metrics.onTimeRate}%</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Total</span>
+                                <span class="stat-value">${user.metrics.totalTasks}</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Streak</span>
+                                <span class="stat-value">${user.metrics.currentStreak || 0}</span>
+                            </div>
+                        </div>
+                        <div class="performance-indicator">
+                            <div class="performance-ring" style="--percentage: ${user.metrics.completionRate}%;">
+                                <span>${user.metrics.completionRate}%</span>
+                            </div>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+    `;
+
+        // Insert leaderboard into analytics section
+        const analyticsOverview = document.querySelector('#analytics .analytics-overview');
+        if (analyticsOverview) {
+            analyticsOverview.appendChild(leaderboardContainer);
+        }
+
+        // Add leaderboard-specific CSS
+        addLeaderboardCSS();
+    }
+
+    function addLeaderboardCSS() {
+        if (document.getElementById('leaderboard-css')) return;
+
+        const style = document.createElement('style');
+        style.id = 'leaderboard-css';
+        style.textContent = `
+        .leaderboard-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+        
+        .leaderboard-filters {
+            display: flex;
+            gap: 1rem;
+        }
+        
+        .leaderboard-filters select {
+            padding: 0.5rem;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            background: white;
+            font-size: 0.9rem;
+        }
+        
+        .leaderboard-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+        
+        .leaderboard-item {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1rem;
+            background: #f8fafc;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+            transition: all 0.2s ease;
+        }
+        
+        .leaderboard-item:hover {
+            background: #f1f5f9;
+            transform: translateX(4px);
+        }
+        
+        .leaderboard-item.top-1 {
+            background: linear-gradient(135deg, #fef3c7, #fde68a);
+            border-color: #f59e0b;
+        }
+        
+        .leaderboard-item.top-2 {
+            background: linear-gradient(135deg, #e5e7eb, #d1d5db);
+            border-color: #9ca3af;
+        }
+        
+        .leaderboard-item.top-3 {
+            background: linear-gradient(135deg, #fed7d7, #fbb6ce);
+            border-color: #f87171;
+        }
+        
+        .rank-badge {
+            font-size: 1.25rem;
+            font-weight: 700;
+            min-width: 40px;
+            text-align: center;
+        }
+        
+        .user-avatar-small {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+            font-size: 1rem;
+        }
+        
+        .user-details {
+            flex: 1;
+        }
+        
+        .user-name {
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 0.25rem;
+        }
+        
+        .user-department {
+            font-size: 0.8rem;
+            color: #64748b;
+        }
+        
+        .user-stats {
+            display: flex;
+            gap: 1rem;
+        }
+        
+        .stat-item {
+            text-align: center;
+        }
+        
+        .stat-label {
+            display: block;
+            font-size: 0.7rem;
+            color: #64748b;
+            margin-bottom: 0.25rem;
+        }
+        
+        .stat-value {
+            font-weight: 700;
+            color: #1e293b;
+            font-size: 0.9rem;
+        }
+        
+        .performance-indicator {
+            display: flex;
+            align-items: center;
+        }
+        
+        .performance-ring {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: conic-gradient(#10b981 0% var(--percentage), #e5e7eb var(--percentage) 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+        
+        .performance-ring::before {
+            content: '';
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: white;
+            position: absolute;
+        }
+        
+        .performance-ring span {
+            position: relative;
+            z-index: 1;
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: #1e293b;
+        }
+        
+        @media (max-width: 768px) {
+            .leaderboard-item {
+                flex-wrap: wrap;
+                gap: 0.5rem;
+            }
+            
+            .user-stats {
+                order: 3;
+                width: 100%;
+                justify-content: space-around;
+            }
+            
+            .performance-indicator {
+                order: 2;
+            }
+        }
+    `;
+
+        document.head.appendChild(style);
+    }
+
+
+
     async function handleAddUser(e) {
         e.preventDefault();
 
@@ -1108,6 +2827,80 @@ document.addEventListener('DOMContentLoaded', function () {
         } catch (error) {
             console.error('Error approving task:', error);
             showMessage('Error approving task', 'error');
+        }
+    };
+
+    // Update leaderboard based on filters
+    window.updateLeaderboard = async function () {
+        const period = document.getElementById('leaderboardPeriod')?.value || '30';
+        const metric = document.getElementById('leaderboardMetric')?.value || 'completion';
+
+        try {
+            const response = await fetch(`${API_URL}/analytics/leaderboard?period=${period}&metric=${metric}`, {
+                headers: getAuthHeaders()
+            });
+
+            const leaderboard = await response.json();
+
+            // Re-render leaderboard
+            const existingLeaderboard = document.querySelector('.leaderboard-section');
+            if (existingLeaderboard) {
+                existingLeaderboard.remove();
+            }
+
+            renderLeaderboard(leaderboard);
+        } catch (error) {
+            console.error('Error updating leaderboard:', error);
+        }
+    };
+
+    window.approveTaskFromModal = async function (taskId) {
+        if (!confirm('Are you sure you want to approve this task?')) return;
+
+        try {
+            const response = await fetch(`${API_URL}/tasks/${taskId}/approve`, {
+                method: 'POST',
+                headers: getAuthHeaders()
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                showMessage('Task approved successfully', 'success');
+                document.querySelector('.modal').remove();
+                loadTasks();
+                loadUpcomingDueDates();
+            } else {
+                showMessage(result.error, 'error');
+            }
+        } catch (error) {
+            showMessage('Error approving task', 'error');
+        }
+    };
+
+    window.rejectTaskFromModal = async function (taskId) {
+        const reason = prompt('Please provide a reason for rejection:');
+        if (!reason) return;
+
+        try {
+            const response = await fetch(`${API_URL}/tasks/${taskId}/reject`, {
+                method: 'POST',
+                headers: getAuthHeaders(),
+                body: JSON.stringify({ reason })
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                showMessage('Task rejected successfully', 'success');
+                document.querySelector('.modal').remove();
+                loadTasks();
+                loadUpcomingDueDates();
+            } else {
+                showMessage(result.error, 'error');
+            }
+        } catch (error) {
+            showMessage('Error rejecting task', 'error');
         }
     };
 
@@ -1449,53 +3242,6 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    function loadSectionData(section) {
-        switch (section) {
-            case 'dashboard':
-                updateDashboardStats();
-                break;
-            case 'users':
-                loadUsers();
-                break;
-            case 'jobs':
-                loadJobs();
-                break;
-            case 'tasks':
-                loadTasks();
-                // Add task filters after loading tasks
-                setTimeout(() => {
-                    addTaskFilters();
-                }, 100);
-                break;
-            case 'analytics':
-                loadAnalytics();
-                break;
-        }
-    }
-
-    async function loadAnalytics() {
-        try {
-            const response = await fetch(`${API_URL}/analytics/users`, {
-                headers: getAuthHeaders()
-            });
-            const analytics = await response.json();
-            renderAnalytics(analytics);
-        } catch (error) {
-            showMessage('Error loading analytics', 'error');
-        }
-    }
-
-    function renderAnalytics(analytics) {
-        const charts = document.querySelectorAll('.chart-container');
-        charts.forEach(chart => {
-            chart.innerHTML = `
-                <div style="text-align: center;">
-                    <p>Analytics data loaded</p>
-                    <p>${analytics.length} users analyzed</p>
-                </div>
-            `;
-        });
-    }
 
     async function logout() {
         try {

@@ -2,8 +2,8 @@ document.addEventListener('DOMContentLoaded', function () {
     let currentUser = null;
     let tasks = [];
     let searchResults = [];
-    const API_URL = 'https://atpl-daily-task-management.onrender.com/api';
-    // const API_URL = 'http://localhost:3000/api';
+    // const API_URL = 'https://atpl-daily-task-management.onrender.com/api';
+    const API_URL = 'http://localhost:3000/api';
     let users = [];
     const groupedTaskStyles = `
 <style>
@@ -280,7 +280,10 @@ document.addEventListener('DOMContentLoaded', function () {
             // ADD THIS LINE:
             calculateAndUpdateStats();
 
+            calculateAndUpdateStats();
             renderAllTasks();
+            renderDueDatesSection(); // Add this line
+
             const activeTab = document.querySelector('.nav-tab.active');
             if (activeTab && activeTab.dataset.section === 'job-entry') {
                 renderTasksByType('job-entry', 'jobEntryTasksContainer');
@@ -936,6 +939,72 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    function makeDashboardStatsClickable() {
+        // Total tasks click
+        document.querySelector('.stat-card.total')?.addEventListener('click', () => {
+            switchToAllTasks();
+        });
+
+        // Pending tasks click
+        document.querySelector('.stat-card.pending')?.addEventListener('click', () => {
+            switchToAllTasks('pending');
+        });
+
+        // Completed tasks click
+        document.querySelector('.stat-card.completed')?.addEventListener('click', () => {
+            switchToAllTasks('completed');
+        });
+
+        // Overdue tasks click
+        document.querySelector('.stat-card.overdue')?.addEventListener('click', () => {
+            switchToAllTasks('overdue');
+        });
+
+        // Due dates clicks
+        setupDueDateClicks();
+    }
+
+    function setupDueDateClicks() {
+        // Due dates section clicks
+        document.getElementById('dueToday')?.parentElement?.addEventListener('click', () => {
+            showDueDateTasks('today');
+        });
+
+        document.getElementById('dueTomorrow')?.parentElement?.addEventListener('click', () => {
+            showDueDateTasks('tomorrow');
+        });
+
+        document.getElementById('dueThisWeek')?.parentElement?.addEventListener('click', () => {
+            showDueDateTasks('week');
+        });
+
+        document.getElementById('dueThisMonth')?.parentElement?.addEventListener('click', () => {
+            showDueDateTasks('month');
+        });
+    }
+
+
+    function switchToAllTasks(filterType = null) {
+        // Switch to all-tasks section
+        const navTabs = document.querySelectorAll('.nav-tab');
+        const sections = document.querySelectorAll('.section');
+
+        navTabs.forEach(tab => tab.classList.remove('active'));
+        sections.forEach(section => section.classList.remove('active'));
+
+        document.querySelector('[data-section="all-tasks"]').classList.add('active');
+        document.getElementById('all-tasks').classList.add('active');
+
+        // Apply filter if specified
+        if (filterType) {
+            setTimeout(() => {
+                filterUserTasks(filterType);
+            }, 100);
+        } else {
+            renderAllTasks();
+        }
+    }
+
     // MODIFY THIS FUNCTION:
     function updateDueDatesSection(stats) {
         // Update due dates display
@@ -974,6 +1043,351 @@ document.addEventListener('DOMContentLoaded', function () {
             container.appendChild(moreItem);
         }
     }
+
+    function renderDueDatesSection() {
+        const today = new Date();
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const weekEnd = new Date(today);
+        weekEnd.setDate(weekEnd.getDate() + 7);
+        const monthEnd = new Date(today);
+        monthEnd.setMonth(monthEnd.getMonth() + 1);
+
+        const dueTodayTasks = tasks.filter(t =>
+            t.status === 'pending' && new Date(t.dueDate).toDateString() === today.toDateString()
+        );
+
+        const dueTomorrowTasks = tasks.filter(t =>
+            t.status === 'pending' && new Date(t.dueDate).toDateString() === tomorrow.toDateString()
+        );
+
+        const dueThisWeekTasks = tasks.filter(t =>
+            t.status === 'pending' && new Date(t.dueDate) >= today && new Date(t.dueDate) <= weekEnd
+        );
+
+        const dueThisMonthTasks = tasks.filter(t =>
+            t.status === 'pending' && new Date(t.dueDate) >= today && new Date(t.dueDate) <= monthEnd
+        );
+
+        // Update counters
+        document.getElementById('dueToday').textContent = dueTodayTasks.length;
+        document.getElementById('dueTomorrow').textContent = dueTomorrowTasks.length;
+        document.getElementById('dueThisWeek').textContent = dueThisWeekTasks.length;
+        document.getElementById('dueThisMonth').textContent = dueThisMonthTasks.length;
+
+        // Render task lists
+        renderDueTasksList('dueTodayTasks', dueTodayTasks);
+        renderDueTasksList('dueTomorrowTasks', dueTomorrowTasks);
+        renderDueTasksList('dueThisWeekTasks', dueThisWeekTasks);
+        renderDueTasksList('dueThisMonthTasks', dueThisMonthTasks);
+    }
+
+    function renderDueTasksList(containerId, tasks) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+
+        container.innerHTML = '';
+
+        if (tasks.length === 0) {
+            container.innerHTML = '<p style="text-align: center; color: #64748b; padding: 20px; font-size: 0.9rem;">No tasks due</p>';
+            return;
+        }
+
+        tasks.slice(0, 5).forEach(task => {
+            const taskItem = document.createElement('div');
+            taskItem.style.cssText = `
+            padding: 8px 12px;
+            margin-bottom: 6px;
+            background: #f8fafc;
+            border-radius: 6px;
+            border-left: 3px solid ${task.priority === 'urgent' ? '#ef4444' : task.priority === 'high' ? '#f59e0b' : '#3b82f6'};
+            cursor: pointer;
+            transition: all 0.2s ease;
+        `;
+
+            taskItem.innerHTML = `
+            <div style="font-weight: 600; font-size: 0.85rem; margin-bottom: 2px; color: #1e293b;">
+                ${task.title}
+            </div>
+            <div style="font-size: 0.75rem; color: #64748b;">
+                ${task.priority.toUpperCase()} • ${task.type.toUpperCase()}
+            </div>
+        `;
+
+            taskItem.addEventListener('mouseenter', () => {
+                taskItem.style.background = '#e2e8f0';
+                taskItem.style.transform = 'translateX(4px)';
+            });
+
+            taskItem.addEventListener('mouseleave', () => {
+                taskItem.style.background = '#f8fafc';
+                taskItem.style.transform = 'translateX(0)';
+            });
+
+            taskItem.addEventListener('click', () => {
+                openTaskModal(task);
+            });
+
+            container.appendChild(taskItem);
+        });
+
+        if (tasks.length > 5) {
+            const showMoreBtn = document.createElement('button');
+            showMoreBtn.textContent = `+${tasks.length - 5} more`;
+            showMoreBtn.style.cssText = `
+            width: 100%;
+            padding: 6px;
+            background: transparent;
+            border: 1px dashed #cbd5e1;
+            border-radius: 4px;
+            color: #64748b;
+            cursor: pointer;
+            font-size: 0.8rem;
+            margin-top: 6px;
+        `;
+            showMoreBtn.onclick = () => {
+                const period = containerId.includes('Today') ? 'today' :
+                    containerId.includes('Tomorrow') ? 'tomorrow' :
+                        containerId.includes('Week') ? 'week' : 'month';
+                showDueDateTasks(period);
+            };
+            container.appendChild(showMoreBtn);
+        }
+    }
+
+    function showDueDateTasks(period) {
+        // Switch to due-dates section
+        const navTabs = document.querySelectorAll('.nav-tab');
+        const sections = document.querySelectorAll('.section');
+
+        navTabs.forEach(tab => tab.classList.remove('active'));
+        sections.forEach(section => section.classList.remove('active'));
+
+        document.querySelector('[data-section="due-dates"]').classList.add('active');
+        document.getElementById('due-dates').classList.add('active');
+
+        // Filter and show tasks for the period
+        setTimeout(() => {
+            filterDueDateTasks(period);
+        }, 100);
+    }
+
+    function filterDueDateTasks(period) {
+        const today = new Date();
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const weekEnd = new Date(today);
+        weekEnd.setDate(weekEnd.getDate() + 7);
+        const monthEnd = new Date(today);
+        monthEnd.setMonth(monthEnd.getMonth() + 1);
+
+        let filteredTasks = tasks.filter(task => {
+            if (task.status !== 'pending') return false;
+
+            const taskDate = new Date(task.dueDate);
+
+            switch (period) {
+                case 'today':
+                    return taskDate.toDateString() === today.toDateString();
+                case 'tomorrow':
+                    return taskDate.toDateString() === tomorrow.toDateString();
+                case 'week':
+                    return taskDate >= today && taskDate <= weekEnd;
+                case 'month':
+                    return taskDate >= today && taskDate <= monthEnd;
+                default:
+                    return false;
+            }
+        });
+
+        // Create detailed modal with tasks
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.style.display = 'block';
+
+        const periodLabels = {
+            today: 'Due Today',
+            tomorrow: 'Due Tomorrow',
+            week: 'Due This Week',
+            month: 'Due This Month'
+        };
+
+        modal.innerHTML = `
+        <div class="modal-content" style="max-width: 800px; max-height: 90vh; overflow-y: auto;">
+            <div class="modal-header">
+                <h3 class="modal-title">${periodLabels[period]} (${filteredTasks.length} tasks)</h3>
+                <button class="close-btn" onclick="this.closest('.modal').remove()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div id="duePeriodTasksContainer" style="max-height: 60vh; overflow-y: auto;">
+                ${filteredTasks.length === 0 ? `
+                    <p style="text-align: center; color: #64748b; padding: 40px;">
+                        No tasks ${period === 'today' ? 'due today' : period === 'tomorrow' ? 'due tomorrow' : `due this ${period}`}
+                    </p>
+                ` : ''}
+            </div>
+        </div>
+    `;
+
+        document.body.appendChild(modal);
+
+        // Render filtered tasks
+        if (filteredTasks.length > 0) {
+            const container = modal.querySelector('#duePeriodTasksContainer');
+
+            filteredTasks.forEach(task => {
+                const taskCard = createInteractiveTaskCard(task, period === 'today');
+                container.appendChild(taskCard);
+            });
+        }
+    }
+
+    function createInteractiveTaskCard(task, isToday = false) {
+        const card = document.createElement('div');
+        card.style.cssText = `
+        background: white;
+        border-radius: 8px;
+        padding: 16px;
+        margin-bottom: 12px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        border-left: 4px solid ${isToday ? '#ef4444' : '#f59e0b'};
+        transition: all 0.2s ease;
+    `;
+
+        const dueDate = new Date(task.dueDate);
+        const isOverdue = new Date() > dueDate;
+
+        card.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+            <div style="flex: 1;">
+                <h4 style="margin: 0 0 6px 0; color: #1e293b; font-size: 1rem; font-weight: 600;">
+                    ${task.title}
+                </h4>
+                <p style="margin: 0 0 8px 0; color: #64748b; font-size: 0.9rem; line-height: 1.4;">
+                    ${task.description}
+                </p>
+                <div style="display: flex; gap: 12px; font-size: 0.8rem; color: #64748b;">
+                    <span><strong>Priority:</strong> ${task.priority.toUpperCase()}</span>
+                    <span><strong>Type:</strong> ${task.type.toUpperCase()}</span>
+                    <span style="color: ${isOverdue ? '#ef4444' : '#64748b'};">
+                        <strong>Due:</strong> ${dueDate.toLocaleDateString()}
+                        ${isOverdue ? ' (OVERDUE)' : ''}
+                    </span>
+                </div>
+            </div>
+            <div style="display: flex; gap: 8px; flex-shrink: 0;">
+                ${task.status === 'pending' ? `
+                    <button onclick="completeTaskFromDueDate('${task._id}')" style="
+                        background: #10b981; 
+                        color: white; 
+                        border: none; 
+                        padding: 8px 16px; 
+                        border-radius: 6px; 
+                        cursor: pointer; 
+                        font-size: 0.8rem; 
+                        font-weight: 600;
+                        transition: all 0.2s ease;
+                    " onmouseover="this.style.background='#059669'" onmouseout="this.style.background='#10b981'">
+                        ✓ Complete
+                    </button>
+                ` : `
+                    <span style="
+                        padding: 8px 16px; 
+                        background: #dcfce7; 
+                        color: #166534; 
+                        border-radius: 6px; 
+                        font-size: 0.8rem; 
+                        font-weight: 600;
+                    ">
+                        ${task.status.replace('_', ' ').toUpperCase()}
+                    </span>
+                `}
+                <button onclick="viewTaskDetailsFromDueDate('${task._id}')" style="
+                    background: #3b82f6; 
+                    color: white; 
+                    border: none; 
+                    padding: 8px 12px; 
+                    border-radius: 6px; 
+                    cursor: pointer; 
+                    font-size: 0.8rem;
+                    transition: all 0.2s ease;
+                " onmouseover="this.style.background='#2563eb'" onmouseout="this.style.background='#3b82f6'">
+                    👁️
+                </button>
+            </div>
+        </div>
+        
+        ${task.jobDetails ? `
+            <div style="background: #eff6ff; padding: 10px; border-radius: 6px; border-left: 3px solid #3b82f6;">
+                <div style="font-weight: 600; color: #1e40af; margin-bottom: 4px; font-size: 0.85rem;">
+                    📋 ${task.jobDetails.customerName} - ${task.jobDetails.itemCode}
+                </div>
+                <div style="color: #1e40af; font-size: 0.8rem;">
+                    Doc: ${task.jobDetails.docNo} | Qty: ${task.jobDetails.qty}
+                </div>
+            </div>
+        ` : ''}
+    `;
+
+        return card;
+    }
+
+
+    function filterUserTasks(filterType) {
+        const container = document.getElementById('allTasksContainer');
+        container.innerHTML = '';
+
+        let filteredTasks = tasks.filter(task => {
+            // Check if current user is assigned to this task
+            const isAssignedToMe = Array.isArray(task.assignedTo)
+                ? task.assignedTo.some(assignee => assignee._id === currentUser.id)
+                : (task.assignedTo._id === currentUser.id || task.assignedTo === currentUser.id);
+
+            if (!isAssignedToMe) return false;
+
+            // Apply status filter
+            switch (filterType) {
+                case 'pending':
+                    return task.status === 'pending';
+                case 'completed':
+                    return task.status === 'completed';
+                case 'overdue':
+                    return task.status === 'pending' && new Date(task.dueDate) < new Date();
+                default:
+                    return true;
+            }
+        });
+
+        if (filteredTasks.length === 0) {
+            container.innerHTML = `<p style="text-align: center; color: #64748b; padding: 40px;">No ${filterType} tasks found</p>`;
+            return;
+        }
+
+        // Create header with filter info
+        const header = document.createElement('div');
+        header.style.cssText = 'margin-bottom: 20px; padding: 15px; background: white; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);';
+        header.innerHTML = `
+        <h4 style="margin: 0; color: #1e293b;">
+            ${filterType.charAt(0).toUpperCase() + filterType.slice(1)} Tasks (${filteredTasks.length})
+        </h4>
+        <p style="margin: 5px 0 0 0; color: #64748b; font-size: 0.9rem;">
+            Showing ${filterType} tasks assigned to you
+        </p>
+    `;
+        container.appendChild(header);
+
+        // Create grid container
+        const gridContainer = document.createElement('div');
+        gridContainer.className = 'tasks-grid';
+
+        filteredTasks.forEach(task => {
+            gridContainer.appendChild(createTaskCard(task));
+        });
+
+        container.appendChild(gridContainer);
+    }
+
 
     async function performUniversalSearch() {
         const query = document.getElementById('universalSearch').value.trim();
@@ -1058,6 +1472,24 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('completeTaskId').value = taskId;
         openModal('completeTaskModal');
     };
+
+    window.completeTaskFromDueDate = function (taskId) {
+        document.querySelector('.modal').remove();
+        completeTask(taskId);
+    };
+
+    // View task details from due date modal
+    window.viewTaskDetailsFromDueDate = function (taskId) {
+        const task = tasks.find(t => t._id === taskId);
+        if (task) {
+            // Close current modal
+            document.querySelector('.modal').remove();
+            // Open task details modal (use the same function as admin)
+            setTimeout(() => openTaskModal(task), 100);
+        }
+    };
+
+
 
     window.viewTaskDetails = function (taskId) {
         if (!taskId || taskId === 'undefined') {

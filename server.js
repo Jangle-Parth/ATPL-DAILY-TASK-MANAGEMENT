@@ -7,6 +7,9 @@ const XLSX = require('xlsx');
 const path = require('path');
 const fs = require('fs');
 const jwt = require('jsonwebtoken');
+const emailService = require('./services/emailService');
+const cronService = require('./services/cronService');
+cronService.init();
 
 // Database connection
 const connectDB = require('./config/database');
@@ -181,6 +184,352 @@ async function createAutoTask(job, status, assignedToId) {
     }
 }
 
+async function getUserPersonalAnalytics(userId, startDate, endDate) {
+    const tasks = await Task.find({
+        assignedTo: userId,
+        createdAt: { $gte: startDate, $lte: endDate }
+    }).populate('assignedBy', 'username');
+
+    const allUserTasks = await Task.find({ assignedTo: userId });
+
+    return {
+        summary: {
+            totalTasks: tasks.length,
+            completedTasks: tasks.filter(t => t.status === 'completed').length,
+            pendingTasks: tasks.filter(t => t.status === 'pending').length,
+            overdueTasks: tasks.filter(t => t.status === 'pending' && new Date(t.dueDate) < new Date()).length,
+            lifetimeTotal: allUserTasks.length
+        },
+        performance: {
+            completionRate: allUserTasks.length > 0 ? ((allUserTasks.filter(t => t.status === 'completed').length / allUserTasks.length) * 100).toFixed(2) : 0,
+            averageCompletionTime: calculateAverageCompletionTime(allUserTasks),
+            onTimeDeliveryRate: calculateOnTimeDeliveryRate(allUserTasks),
+            streak: calculateCompletionStreak(allUserTasks)
+        },
+        distributions: {
+            tasksByPriority: calculateDistribution(allUserTasks, 'priority'),
+            tasksByType: calculateDistribution(allUserTasks, 'type'),
+            tasksByMonth: calculateMonthlyDistribution(allUserTasks)
+        },
+        trends: {
+            monthly: calculateMonthlyTrends(allUserTasks),
+            performance: calculatePersonalPerformanceTrend(allUserTasks)
+        }
+    };
+}
+
+// Analytics helper functions
+function calculateDistribution(items, field) {
+    const distribution = {};
+    items.forEach(item => {
+        const value = item[field] || 'Unknown';
+        distribution[value] = (distribution[value] || 0) + 1;
+    });
+    return distribution;
+}
+
+function calculateTasksByDepartment(tasks) {
+    const departments = {};
+    tasks.forEach(task => {
+        if (task.assignedTo && task.assignedTo.department) {
+            const dept = task.assignedTo.department;
+            departments[dept] = (departments[dept] || 0) + 1;
+        }
+    });
+    return departments;
+}
+
+function calculateDailyTrends(tasks, startDate, endDate) {
+    const trends = {};
+    const currentDate = new Date(startDate);
+
+    while (currentDate <= endDate) {
+        const dateKey = currentDate.toISOString().split('T')[0];
+        trends[dateKey] = {
+            created: 0,
+            completed: 0,
+            pending: 0
+        };
+
+        tasks.forEach(task => {
+            const taskCreated = new Date(task.createdAt).toISOString().split('T')[0];
+            if (taskCreated === dateKey) {
+                trends[dateKey].created++;
+            }
+
+            if (task.status === 'completed' && task.approvedAt) {
+                const taskCompleted = new Date(task.approvedAt).toISOString().split('T')[0];
+                if (taskCompleted === dateKey) {
+                    trends[dateKey].completed++;
+                }
+            }
+
+            if (task.status === 'pending') {
+                trends[dateKey].pending++;
+            }
+        });
+
+        currentDate.setDate(currentDate.getDate() + 1);
+    }
+
+    return trends;
+}
+
+function calculateWeeklyTrends(tasks, startDate, endDate) {
+    const weeks = {};
+    const weekMs = 7 * 24 * 60 * 60 * 1000;
+
+    for (let i = 0; i < 4; i++) {
+        const weekStart = new Date(endDate.getTime() - (i + 1) * weekMs);
+        const weekEnd = new Date(endDate.getTime() - i * weekMs);
+        const weekKey = `Week ${4 - i}`;
+
+        weeks[weekKey] = {
+            created: tasks.filter(t => {
+                const created = new Date(t.createdAt);
+                return created >= weekStart && created < weekEnd;
+            }).length,
+            completed: tasks.filter(t => {
+                if (!t.approvedAt) return false;
+                const completed = new Date(t.approvedAt);
+                return completed >= weekStart && completed < weekEnd;
+            }).length
+        };
+    }
+
+    return weeks;
+}
+
+function calculateProductivityTrends(tasks, users) {
+    const productivity = {};
+
+    users.forEach(user => {
+        const userTasks = tasks.filter(task => {
+            if (!task.assignedTo || !Array.isArray(task.assignedTo)) {
+                return false;
+            }
+
+            return task.assignedTo.some(assignee => {
+                // Handle case where assignedTo contains user objects with _id
+                if (typeof assignee === 'object' && assignee._id) {
+                    return assignee._id.toString() === user._id.toString();
+                }
+                // Handle case where assignedTo contains just user ID strings
+                if (typeof assignee === 'string') {
+                    return assignee === user._id.toString();
+                }
+                return false;
+            });
+        }
+        );
+
+        const completedTasks = userTasks.filter(t => t.status === 'completed');
+        const pendingTasks = userTasks.filter(t => t.status === 'pending');
+
+        productivity[user.username] = {
+            total: userTasks.length,
+            completed: completedTasks.length,
+            pending: pendingTasks.length,
+            rate: userTasks.length > 0 ?
+                ((completedTasks.length / userTasks.length) * 100).toFixed(2) : 0
+        };
+    });
+
+    return productivity;
+}
+
+async function calculateDepartmentAnalytics(tasks, users) {
+    const departments = {};
+
+    // Group users by department
+    const deptUsers = {};
+    users.forEach(user => {
+        if (!deptUsers[user.department]) {
+            deptUsers[user.department] = [];
+        }
+        deptUsers[user.department].push(user._id);
+    });
+
+    // Calculate analytics for each department
+    Object.keys(deptUsers).forEach(dept => {
+        const deptTasks = tasks.filter(t =>
+            t.assignedTo && deptUsers[dept].includes(t.assignedTo._id)
+        );
+
+        departments[dept] = {
+            users: deptUsers[dept].length,
+            totalTasks: deptTasks.length,
+            completedTasks: deptTasks.filter(t => t.status === 'completed').length,
+            pendingTasks: deptTasks.filter(t => t.status === 'pending').length,
+            overdueTasks: deptTasks.filter(t => t.status === 'pending' && new Date(t.dueDate) < new Date()).length,
+            averageCompletionTime: calculateAverageCompletionTime(deptTasks),
+            completionRate: deptTasks.length > 0 ?
+                ((deptTasks.filter(t => t.status === 'completed').length / deptTasks.length) * 100).toFixed(2) : 0
+        };
+    });
+
+    return departments;
+}
+
+function identifyBottlenecks(tasks) {
+    const bottlenecks = [];
+
+    // Identify users with high pending task counts
+    const userPendingCounts = {};
+    tasks.filter(t => t.status === 'pending').forEach(task => {
+        if (task.assignedTo) {
+            const userId = task.assignedTo._id || task.assignedTo;
+            userPendingCounts[userId] = (userPendingCounts[userId] || 0) + 1;
+        }
+    });
+
+    Object.entries(userPendingCounts).forEach(([userId, count]) => {
+        if (count > 5) { // Threshold for bottleneck
+            bottlenecks.push({
+                type: 'user_overload',
+                userId,
+                pendingTasks: count,
+                severity: count > 10 ? 'high' : 'medium'
+            });
+        }
+    });
+
+    // Identify job stages with delays
+    const jobTasks = tasks.filter(t => t.type === 'job-auto' && t.status === 'pending');
+    const stageDelays = {};
+
+    jobTasks.forEach(task => {
+        if (task.jobDetails && task.jobDetails.currentStage) {
+            const stage = task.jobDetails.currentStage;
+            const daysPending = Math.floor((new Date() - new Date(task.createdAt)) / (1000 * 60 * 60 * 24));
+
+            if (!stageDelays[stage]) {
+                stageDelays[stage] = { count: 0, totalDays: 0 };
+            }
+            stageDelays[stage].count++;
+            stageDelays[stage].totalDays += daysPending;
+        }
+    });
+
+    Object.entries(stageDelays).forEach(([stage, data]) => {
+        const avgDays = data.totalDays / data.count;
+        if (avgDays > 7) { // Threshold for stage bottleneck
+            bottlenecks.push({
+                type: 'stage_delay',
+                stage,
+                averageDays: avgDays.toFixed(1),
+                taskCount: data.count,
+                severity: avgDays > 14 ? 'high' : 'medium'
+            });
+        }
+    });
+
+    return bottlenecks;
+}
+
+function calculateOnTimeDeliveryRate(tasks) {
+    const completedTasks = tasks.filter(t => t.status === 'completed' && t.approvedAt);
+    if (completedTasks.length === 0) return 0;
+
+    const onTimeTasks = completedTasks.filter(t =>
+        new Date(t.approvedAt) <= new Date(t.dueDate)
+    );
+
+    return ((onTimeTasks.length / completedTasks.length) * 100).toFixed(2);
+}
+
+function calculateCompletionStreak(tasks) {
+    const completedTasks = tasks
+        .filter(t => t.status === 'completed')
+        .sort((a, b) => new Date(b.approvedAt) - new Date(a.approvedAt));
+
+    let streak = 0;
+    let lastCompletionDate = null;
+
+    for (const task of completedTasks) {
+        const completionDate = new Date(task.approvedAt);
+        completionDate.setHours(0, 0, 0, 0);
+
+        if (!lastCompletionDate) {
+            lastCompletionDate = completionDate;
+            streak = 1;
+        } else {
+            const daysDiff = Math.floor((lastCompletionDate - completionDate) / (1000 * 60 * 60 * 24));
+            if (daysDiff <= 1) {
+                streak++;
+                lastCompletionDate = completionDate;
+            } else {
+                break;
+            }
+        }
+    }
+
+    return streak;
+}
+
+function calculateMonthlyDistribution(tasks) {
+    const months = {};
+    tasks.forEach(task => {
+        const month = new Date(task.createdAt).toISOString().substring(0, 7); // YYYY-MM
+        months[month] = (months[month] || 0) + 1;
+    });
+    return months;
+}
+
+function forecastCompletions(tasks) {
+    const completedTasks = tasks.filter(t => t.status === 'completed');
+    const pendingTasks = tasks.filter(t => t.status === 'pending');
+
+    if (completedTasks.length === 0) return { nextWeek: 0, nextMonth: 0 };
+
+    const avgCompletionTime = calculateAverageCompletionTime(tasks);
+    const completionRate = completedTasks.length / tasks.length;
+
+    return {
+        nextWeek: Math.round(pendingTasks.length * completionRate * 0.3),
+        nextMonth: Math.round(pendingTasks.length * completionRate),
+        avgCompletionTime: `${avgCompletionTime} days`
+    };
+}
+
+function estimateDelay(tasks) {
+    const overdueTasks = tasks.filter(t =>
+        t.status === 'pending' && new Date(t.dueDate) < new Date()
+    );
+
+    if (overdueTasks.length === 0) return { averageDelay: 0, totalOverdue: 0 };
+
+    const totalDelay = overdueTasks.reduce((sum, task) => {
+        const delay = Math.floor((new Date() - new Date(task.dueDate)) / (1000 * 60 * 60 * 24));
+        return sum + delay;
+    }, 0);
+
+    return {
+        averageDelay: (totalDelay / overdueTasks.length).toFixed(1),
+        totalOverdue: overdueTasks.length,
+        maxDelay: Math.max(...overdueTasks.map(t =>
+            Math.floor((new Date() - new Date(t.dueDate)) / (1000 * 60 * 60 * 24))
+        ))
+    };
+}
+
+function analyzeCapacity(tasks, users) {
+    const activeUsers = users.filter(u => u.isActive).length;
+    const avgTasksPerUser = tasks.length / activeUsers;
+    const pendingTasksPerUser = tasks.filter(t => t.status === 'pending').length / activeUsers;
+
+    return {
+        totalCapacity: activeUsers,
+        averageTasksPerUser: avgTasksPerUser.toFixed(1),
+        averagePendingPerUser: pendingTasksPerUser.toFixed(1),
+        utilizationRate: ((pendingTasksPerUser / 10) * 100).toFixed(1), // Assuming 10 tasks per user is 100% utilization
+        recommendation: pendingTasksPerUser > 8 ? 'Consider redistributing tasks or hiring' :
+            pendingTasksPerUser < 3 ? 'Capacity available for additional work' :
+                'Capacity is well balanced'
+    };
+}
+
+
 // REPLACE requireAuth function:
 function requireAuth(req, res, next) {
     const token = req.headers.authorization?.split(' ')[1]; // Bearer token
@@ -300,6 +649,58 @@ app.get('/api/users', requireAdmin, async (req, res) => {
     } catch (error) {
         console.error('Error fetching users:', error);
         res.status(500).json({ error: 'Error fetching users' });
+    }
+});
+
+// User ranking and leaderboard
+app.get('/api/analytics/leaderboard', requireAuth, async (req, res) => {
+    try {
+        const user = await User.findById(req.userId);
+
+        if (user.role !== 'admin' && user.role !== 'super-admin') {
+            return res.status(403).json({ error: 'Admin access required' });
+        }
+
+        const users = await User.find({ role: 'user', isActive: true });
+        const leaderboard = [];
+
+        for (const u of users) {
+            const userTasks = await Task.find({ assignedTo: u._id });
+            const completedTasks = userTasks.filter(t => t.status === 'completed');
+            const onTimeTasks = completedTasks.filter(t =>
+                t.approvedAt && new Date(t.approvedAt) <= new Date(t.dueDate)
+            );
+
+            leaderboard.push({
+                user: {
+                    id: u._id,
+                    username: u.username,
+                    department: u.department
+                },
+                metrics: {
+                    totalTasks: userTasks.length,
+                    completedTasks: completedTasks.length,
+                    completionRate: userTasks.length > 0 ?
+                        ((completedTasks.length / userTasks.length) * 100).toFixed(2) : 0,
+                    onTimeRate: completedTasks.length > 0 ?
+                        ((onTimeTasks.length / completedTasks.length) * 100).toFixed(2) : 0,
+                    averageCompletionTime: calculateAverageCompletionTime(userTasks),
+                    currentStreak: calculateCompletionStreak(userTasks)
+                }
+            });
+        }
+
+        // Sort by completion rate, then by on-time rate
+        leaderboard.sort((a, b) => {
+            const aScore = parseFloat(a.metrics.completionRate) + parseFloat(a.metrics.onTimeRate);
+            const bScore = parseFloat(b.metrics.completionRate) + parseFloat(b.metrics.onTimeRate);
+            return bScore - aScore;
+        });
+
+        res.json(leaderboard);
+    } catch (error) {
+        console.error('Error generating leaderboard:', error);
+        res.status(500).json({ error: 'Error generating leaderboard' });
     }
 });
 
@@ -906,6 +1307,10 @@ app.post('/api/tasks', requireAuth, async (req, res) => {
 
         const task = await Task.create(taskData);
 
+        for (const assignee of assignees) {
+            await emailService.sendTaskAssignmentEmail(assignee, task, user);
+        }
+
         const assignedUsers = await User.find({ _id: { $in: assigneeIds } });
         const usernames = assignedUsers.map(u => u.username).join(', ');
         await logActivity('TASK_CREATED', req.userId, `Created task: ${title} for ${usernames}`, req);
@@ -928,7 +1333,8 @@ app.post('/api/tasks/:id/complete', requireAuth, async (req, res) => {
             return res.status(400).json({ error: 'Invalid task ID' });
         }
 
-        const task = await Task.findById(taskId);
+        const task = await Task.findById(taskId).populate('assignedTo', 'username email')
+            .populate('assignedBy', 'username email');;
 
         if (!task) {
             return res.status(404).json({ error: 'Task not found' });
@@ -940,6 +1346,8 @@ app.post('/api/tasks/:id/complete', requireAuth, async (req, res) => {
             return res.status(403).json({ error: 'Not authorized to complete this task' });
         }
 
+        const completedByUser = await User.findById(req.userId);
+
         // For job-auto tasks (single assignee) - original logic
         if (task.type === 'job-auto') {
             task.status = 'pending_approval';
@@ -948,6 +1356,9 @@ app.post('/api/tasks/:id/complete', requireAuth, async (req, res) => {
             if (attachments) task.completionAttachments = attachments;
 
             await task.save();
+
+            await emailService.sendTaskCompletionRequestEmail(task, completedByUser);
+
 
             // Create next task in job flow if needed
             if (task.jobId && task.jobDetails.nextStage && task.jobDetails.nextStage !== 'completed') {
@@ -996,6 +1407,8 @@ app.post('/api/tasks/:id/complete', requireAuth, async (req, res) => {
                     .map(comp => comp.remarks)
                     .filter(Boolean)
                     .join('; ');
+
+                await emailService.sendTaskCompletionRequestEmail(task, completedByUser);
             }
 
             await task.save();
@@ -1015,6 +1428,7 @@ app.post('/api/tasks/:id/complete', requireAuth, async (req, res) => {
         if (attachments) task.completionAttachments = attachments;
 
         await task.save();
+        await emailService.sendTaskCompletionRequestEmail(task, completedByUser);
 
         await logActivity('TASK_COMPLETED', req.userId, `Completed task: ${task.title} `, req);
         res.json({ success: true, message: 'Task submitted for approval' });
@@ -1022,6 +1436,31 @@ app.post('/api/tasks/:id/complete', requireAuth, async (req, res) => {
     } catch (error) {
         console.error('Error completing task:', error);
         res.status(500).json({ error: 'Error completing task' });
+    }
+});
+
+app.post('/api/email/test-completion-request', requireAuth, async (req, res) => {
+    try {
+        const user = await User.findById(req.userId);
+
+        // Create a mock task object for testing
+        const mockTask = {
+            title: 'Test Task - Email Notification',
+            description: 'This is a test task to verify the completion request email functionality',
+            assignedTo: [{ username: user.username }],
+            assignedBy: req.userId,
+            priority: 'medium',
+            dueDate: new Date(),
+            completedAt: new Date(),
+            completionRemarks: 'This is a test completion with remarks for email testing',
+            individualCompletions: []
+        };
+
+        await emailService.sendTaskCompletionRequestEmail(mockTask, user);
+        res.json({ success: true, message: 'Test completion request email sent to admins' });
+    } catch (error) {
+        console.error('Error sending test completion email:', error);
+        res.status(500).json({ error: 'Error sending test email' });
     }
 });
 
@@ -1087,6 +1526,9 @@ app.post('/api/tasks/assign-peer', requireAuth, async (req, res) => {
         });
 
         const task = await Task.create(taskData);
+        for (const assignee of assignees) {
+            await emailService.sendTaskAssignmentEmail(assignee, task, assignerUser);
+        }
 
         const usernames = assignees.map(u => u.username).join(', ');
         await logActivity('PEER_TASK_ASSIGNED', req.userId, `Assigned task: ${title} to ${usernames} `, req);
@@ -1232,6 +1674,181 @@ app.post('/api/tasks/:id/approve', requireAuth, async (req, res) => {
     }
 });
 
+app.get('/api/analytics/due-dates', requireAuth, async (req, res) => {
+    try {
+        const user = await User.findById(req.userId);
+        let taskQuery = {};
+
+        // Filter tasks based on user role
+        if (user.role === 'super-admin') {
+            taskQuery = { status: { $in: ['pending', 'in_progress'] } };
+        } else if (user.role === 'admin') {
+            taskQuery = {
+                status: { $in: ['pending', 'in_progress'] },
+                type: { $ne: 'super-admin' }
+            };
+        } else {
+            taskQuery = {
+                status: { $in: ['pending', 'in_progress'] },
+                assignedTo: user._id
+            };
+        }
+
+        const tasks = await Task.find(taskQuery)
+            .populate('assignedTo', 'username')
+            .populate('assignedBy', 'username')
+            .sort({ dueDate: 1 });
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const tomorrow = new Date(today);
+        tomorrow.setDate(today.getDate() + 1);
+
+        const thisWeek = new Date(today);
+        thisWeek.setDate(today.getDate() + 7);
+
+        const dueDates = {
+            today: tasks.filter(task => {
+                const taskDate = new Date(task.dueDate);
+                taskDate.setHours(0, 0, 0, 0);
+                return taskDate.getTime() === today.getTime();
+            }),
+            tomorrow: tasks.filter(task => {
+                const taskDate = new Date(task.dueDate);
+                taskDate.setHours(0, 0, 0, 0);
+                return taskDate.getTime() === tomorrow.getTime();
+            }),
+            thisWeek: tasks.filter(task => {
+                const taskDate = new Date(task.dueDate);
+                return taskDate > tomorrow && taskDate <= thisWeek;
+            }),
+            overdue: tasks.filter(task => {
+                const taskDate = new Date(task.dueDate);
+                return taskDate < today;
+            })
+        };
+
+        res.json(dueDates);
+    } catch (error) {
+        console.error('Error fetching due dates analytics:', error);
+        res.status(500).json({ error: 'Error fetching due dates analytics' });
+    }
+});
+
+app.get('/api/analytics/comprehensive', requireAuth, async (req, res) => {
+    try {
+        const user = await User.findById(req.userId);
+        const { period = '30', department, userId } = req.query;
+
+        // Calculate date range
+        const endDate = new Date();
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - parseInt(period));
+
+        // Build base queries
+        let taskQuery = { createdAt: { $gte: startDate, $lte: endDate } };
+        let userQuery = { isActive: true };
+
+        // Apply role-based filtering
+        if (user.role === 'super-admin') {
+            // Super admin sees everything
+        } else if (user.role === 'admin') {
+            taskQuery.type = { $ne: 'super-admin' };
+            userQuery.role = 'user';
+        } else {
+            // Regular users see only their data
+            taskQuery.assignedTo = user._id;
+            return res.json(await getUserPersonalAnalytics(user._id, startDate, endDate));
+        }
+
+        // Apply additional filters
+        if (department) {
+            const deptUsers = await User.find({
+                department: { $regex: new RegExp(department, 'i') },
+                isActive: true
+            }).select('_id');
+            taskQuery.assignedTo = { $in: deptUsers.map(u => u._id) };
+        }
+
+        if (userId) {
+            taskQuery.assignedTo = userId;
+        }
+
+        // Fetch data
+        const [tasks, jobs, users] = await Promise.all([
+            Task.find(taskQuery)
+                .populate('assignedTo', 'username department')
+                .populate('assignedBy', 'username')
+                .populate('jobId', 'docNo customerName'),
+            Job.find({ createdAt: { $gte: startDate, $lte: endDate } }),
+            User.find(userQuery)
+        ]);
+
+        // Calculate comprehensive analytics
+        const analytics = {
+            summary: {
+                totalTasks: tasks.length,
+                completedTasks: tasks.filter(t => t.status === 'completed').length,
+                pendingTasks: tasks.filter(t => t.status === 'pending').length,
+                pendingApprovalTasks: tasks.filter(t => t.status === 'pending_approval').length,
+                rejectedTasks: tasks.filter(t => t.status === 'rejected').length,
+                overdueTasks: tasks.filter(t => t.status === 'pending' && new Date(t.dueDate) < new Date()).length,
+                totalJobs: jobs.length,
+                activeUsers: users.length,
+                period: `${period} days`
+            },
+
+            performance: {
+                completionRate: tasks.length > 0 ? ((tasks.filter(t => t.status === 'completed').length / tasks.length) * 100).toFixed(2) : 0,
+                averageCompletionTime: calculateAverageCompletionTime(tasks),
+                onTimeDeliveryRate: calculateOnTimeDeliveryRate(tasks),
+                taskVelocity: (tasks.filter(t => t.status === 'completed').length / parseInt(period)).toFixed(2)
+            },
+
+            distributions: {
+                tasksByPriority: calculateDistribution(tasks, 'priority'),
+                tasksByType: calculateDistribution(tasks, 'type'),
+                tasksByStatus: calculateDistribution(tasks, 'status'),
+                tasksByDepartment: calculateTasksByDepartment(tasks),
+                jobsByStatus: calculateDistribution(jobs, 'status')
+            },
+
+            trends: {
+                daily: calculateDailyTrends(tasks, startDate, endDate),
+                weekly: calculateWeeklyTrends(tasks, startDate, endDate),
+                productivity: calculateProductivityTrends(tasks, users)
+            },
+
+            topPerformers: await calculateTopPerformers(tasks, users),
+
+            departmentAnalytics: await calculateDepartmentAnalytics(tasks, users),
+
+            riskAnalysis: {
+                overdueTasks: tasks.filter(t => t.status === 'pending' && new Date(t.dueDate) < new Date()),
+                upcomingDeadlines: tasks.filter(t => {
+                    const dueDate = new Date(t.dueDate);
+                    const threeDaysFromNow = new Date();
+                    threeDaysFromNow.setDate(threeDaysFromNow.getDate() + 3);
+                    return t.status === 'pending' && dueDate <= threeDaysFromNow && dueDate >= new Date();
+                }),
+                bottlenecks: identifyBottlenecks(tasks)
+            },
+
+            forecasting: {
+                projectedCompletions: forecastCompletions(tasks),
+                estimatedDelay: estimateDelay(tasks),
+                capacityAnalysis: analyzeCapacity(tasks, users)
+            }
+        };
+
+        res.json(analytics);
+    } catch (error) {
+        console.error('Error generating comprehensive analytics:', error);
+        res.status(500).json({ error: 'Error generating comprehensive analytics' });
+    }
+});
+
 // Analytics Routes
 app.get('/api/analytics/users', requireAdmin, async (req, res) => {
     try {
@@ -1345,6 +1962,34 @@ app.get('/api/dashboard/user', requireAuth, async (req, res) => {
     } catch (error) {
         console.error('Error generating dashboard:', error);
         res.status(500).json({ error: 'Error generating dashboard' });
+    }
+});
+
+app.post('/api/email/test-daily-report', requireAuth, async (req, res) => {
+    try {
+        const user = await User.findById(req.userId);
+        const pendingTasks = await Task.find({
+            assignedTo: req.userId,
+            status: { $in: ['pending', 'in_progress'] }
+        });
+
+        await emailService.sendDailyTaskReport(user, pendingTasks);
+        res.json({ success: true, message: 'Test daily report sent' });
+    } catch (error) {
+        res.status(500).json({ error: 'Error sending test email' });
+    }
+});
+
+app.post('/api/email/test-weekly-report', requireAuth, async (req, res) => {
+    try {
+        const user = await User.findById(req.userId);
+        const cronService = require('./services/cronService');
+        const performanceData = await cronService.calculateWeeklyPerformance(req.userId);
+
+        await emailService.sendWeeklyPerformanceReport(user, performanceData);
+        res.json({ success: true, message: 'Test weekly report sent' });
+    } catch (error) {
+        res.status(500).json({ error: 'Error sending test email' });
     }
 });
 
@@ -1669,6 +2314,10 @@ app.put('/api/jobs/:id/status', requireAdmin, async (req, res) => {
 
         await job.save();
 
+        if (status.toLowerCase() === 'hold' || status.toLowerCase() === 'so cancelled') {
+            await emailService.sendJobStatusAlertToAllDepartments(job, status.toLowerCase());
+        }
+
         // Create auto-task for new status
         const statusKey = status.toLowerCase();
         const flowInfo = statusFlow[statusKey];
@@ -1861,11 +2510,13 @@ process.on('unhandledRejection', (reason, promise) => {
 // Graceful shutdown
 process.on('SIGTERM', () => {
     console.log('SIGTERM received, shutting down gracefully');
+    cronService.stop();
     process.exit(0);
 });
 
 process.on('SIGINT', () => {
     console.log('SIGINT received, shutting down gracefully');
+    cronService.stop();
     process.exit(0);
 });
 
