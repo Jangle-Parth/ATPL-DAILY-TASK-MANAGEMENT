@@ -1386,16 +1386,28 @@ app.post('/api/tasks/:id/complete', requireAuth, async (req, res) => {
             return res.status(400).json({ error: 'Invalid task ID' });
         }
 
-        const task = await Task.findById(taskId).populate('assignedTo', 'username email')
+        const task = await Task.findById(taskId)
+            .populate('assignedTo', 'username email')
             .populate('assignedBy', 'username email');;
 
         if (!task) {
             return res.status(404).json({ error: 'Task not found' });
         }
 
-        // Check if user is assigned to this task
-        const isAssigned = task.assignedTo.some(id => id.toString() === req.userId);
+        const isAssigned = task.assignedTo.some(assignee => {
+            if (assignee && assignee._id) {
+                return assignee._id.toString() === req.userId;
+            }
+            return assignee.toString() === req.userId;
+        });
+
         if (!isAssigned) {
+            console.error('Authorization failed for task completion:', {
+                taskId: taskId,
+                currentUserId: req.userId,
+                assignedToIds: task.assignedTo.map(a => a._id ? a._id.toString() : a.toString()),
+                taskTitle: task.title
+            });
             return res.status(403).json({ error: 'Not authorized to complete this task' });
         }
 
