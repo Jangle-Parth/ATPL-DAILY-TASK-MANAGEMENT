@@ -1139,8 +1139,8 @@ app.get('/api/tasks', requireAuth, async (req, res) => {
         console.log('Task query for', user.role, ':', JSON.stringify(query));
 
         const tasks = await Task.find(query)
-            .populate('assignedTo', 'username department')
-            .populate('assignedBy', 'username')
+            .populate('assignedTo', '_id username department email')
+            .populate('assignedBy', '_id username')
             .populate('jobId', 'docNo customerName itemCode')
             .sort({ createdAt: -1 });
 
