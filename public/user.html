@@ -205,6 +205,76 @@
             color: white;
             font-weight: 600;
         }
+.task-selection-mode .task-item {
+    border: 2px solid #e5e7eb;
+    transition: all 0.2s ease;
+}
+
+.task-selection-mode .task-item.selected {
+    border-color: #3b82f6;
+    background-color: #eff6ff;
+}
+
+.task-checkbox {
+    width: 18px;
+    height: 18px;
+    margin-right: 12px;
+    cursor: pointer;
+}
+
+.selection-controls {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    padding: 15px;
+    background: #f8fafc;
+    border-radius: 8px;
+    align-items: center;
+}
+
+.selected-tasks-container {
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 10px;
+    background: #f8fafc;
+}
+
+.selected-task-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background: white;
+    border-radius: 6px;
+    margin-bottom: 8px;
+    border: 1px solid #e5e7eb;
+}
+
+.selected-task-item:last-child {
+    margin-bottom: 0;
+}
+
+.remove-task-btn {
+    background: #ef4444;
+    color: white;
+    border: none;
+    padding: 4px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.75rem;
+}
+
+.remove-task-btn:hover {
+    background: #dc2626;
+}
+
+.selection-counter {
+    font-weight: 600;
+    color: #3b82f6;
+}
+
 
         .user-details {
             display: flex;
@@ -2427,6 +2497,38 @@
                 <div class="form-actions">
                     <button type="button" class="btn btn-secondary" onclick="closeModal('completeTaskModal')">Cancel</button>
                     <button type="submit" class="btn btn-primary">Submit for Approval</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Complete Multiple Tasks Modal -->
+    <div id="completeMultipleTasksModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Complete Multiple Tasks</h3>
+                <button class="close-btn">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form id="completeMultipleTasksForm">
+                <div class="form-group">
+                    <label class="form-label">Selected Tasks</label>
+                    <div id="selectedTasksList" class="selected-tasks-container">
+                        <!-- Selected tasks will be displayed here -->
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Completion Remarks (for all selected tasks)</label>
+                    <textarea name="remarks" class="form-textarea" placeholder="Add any comments about task completion..." required></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Attachment (Optional)</label>
+                    <input type="file" name="attachment" class="form-input" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png">
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('completeMultipleTasksModal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Complete Selected Tasks</button>
                 </div>
             </form>
         </div>

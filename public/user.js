@@ -1,9 +1,11 @@
 document.addEventListener('DOMContentLoaded', function () {
     let currentUser = null;
     let tasks = [];
+    let isSelectionMode = false;
+    let selectedTasks = new Set();
     let searchResults = [];
-    const API_URL = 'https://atpl-daily-task-management.onrender.com/api';
-    // const API_URL = 'http://localhost:3000/api';
+    // const API_URL = 'https://atpl-daily-task-management.onrender.com/api';
+    const API_URL = 'http://localhost:3000/api';
     let users = [];
     const groupedTaskStyles = `
 <style>
@@ -873,53 +875,168 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function renderGroupedTasks(container, groups) {
+        // Add selection controls at the top
+        const controlsDiv = document.createElement('div');
+        controlsDiv.className = 'selection-controls';
+        controlsDiv.innerHTML = `
+        <button class="btn btn-primary" onclick="toggleSelectionMode()" id="selectionModeBtn">
+            📋 Select Multiple Tasks
+        </button>
+        <button class="btn btn-success" onclick="completeSelectedTasks()" id="completeSelectedBtn" style="display: none;">
+            ✅ Complete Selected (<span id="selectedCount">0</span>)
+        </button>
+        <button class="btn btn-secondary" onclick="cancelSelection()" id="cancelSelectionBtn" style="display: none;">
+            ❌ Cancel Selection
+        </button>
+        <div class="selection-counter" id="selectionInfo" style="display: none;">
+            <span id="selectedTasksCount">0</span> tasks selected
+        </div>
+    `;
+        container.appendChild(controlsDiv);
+
         Object.values(groups).forEach(group => {
+            // Determine if we can complete tasks in this group
+            const currentUser = getCurrentUser();
+            const pendingTasks = group.tasks.filter(task => task.status === 'pending');
+            const canComplete = pendingTasks.length > 0;
+
+            // Check if any tasks are overdue
+            const hasOverdue = group.tasks.some(task => {
+                const dueDate = new Date(task.dueDate);
+                const today = new Date();
+                return task.status === 'pending' && dueDate < today;
+            });
+
             const groupCard = document.createElement('div');
-            groupCard.className = 'task-group-card';
+            groupCard.className = 'job-group-card';
             groupCard.style.cssText = `
             background: white;
             border-radius: 12px;
             padding: 20px;
             margin-bottom: 20px;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
-            cursor: pointer;
-            transition: transform 0.2s;
+            border: ${hasOverdue ? '2px solid #ef4444' : '1px solid #e5e7eb'};
+            transition: all 0.3s ease;
         `;
 
+            // Add group status
+            group.status = group.tasks.every(t => t.status === 'completed') ? 'completed' :
+                group.tasks.some(t => t.status === 'pending') ? 'pending' : 'mixed';
+
             groupCard.innerHTML = `
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <div>
-                    <h4 style="color: #1e293b; margin-bottom: 5px;">${group.title}</h4>
-                    <p style="color: #64748b;">Doc: ${group.docNo} | Customer: ${group.customerName} | ${group.tasks.length} items</p>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <div style="flex: 1;">
+                    <h3 style="
+                        color: #1e293b; 
+                        margin: 0 0 8px 0; 
+                        font-size: 1.1rem; 
+                        font-weight: 700;
+                        display: flex;
+                        align-items: center;
+                        gap: 8px;
+                    ">
+                        📋 ${group.docNo} - ${group.customerName}
+                        ${hasOverdue ? '<span style="color: #ef4444; font-weight: 600; margin-left: 8px;">⚠️ OVERDUE</span>' : ''}
+                        | Items: ${group.tasks.length}
+                    </div>
                 </div>
-                <span style="color: #667eea; font-weight: 600;">Click to expand</span>
+                
+                <div style="display: flex; gap: 8px; flex-shrink: 0;">
+                    ${canComplete ? `
+                        <button class="complete-all-btn" onclick="completeAllInGroup('${group.docNo}', '${group.customerName}')" 
+                                style="
+                                    background: #10b981; 
+                                    color: white; 
+                                    border: none; 
+                                    padding: 8px 16px; 
+                                    border-radius: 8px; 
+                                    cursor: pointer; 
+                                    font-size: 0.85rem; 
+                                    font-weight: 600;
+                                    transition: all 0.2s ease;
+                                    display: flex;
+                                    align-items: center;
+                                    gap: 6px;
+                                ">
+                            ✓ Complete All
+                        </button>
+                    ` : `
+                        <span style="
+                            padding: 8px 16px; 
+                            background: ${group.status === 'completed' ? '#dcfce7' : '#dbeafe'}; 
+                            color: ${group.status === 'completed' ? '#166534' : '#1e40af'}; 
+                            border-radius: 8px; 
+                            font-size: 0.85rem; 
+                            font-weight: 600;
+                        ">
+                            ${group.status.replace('_', ' ').toUpperCase()}
+                        </span>
+                    `}
+                    
+                    <button class="expand-btn" style="
+                        background: #3b82f6; 
+                        color: white; 
+                        border: none; 
+                        padding: 8px 12px; 
+                        border-radius: 8px; 
+                        cursor: pointer; 
+                        font-size: 0.85rem;
+                        font-weight: 600;
+                        transition: all 0.2s ease;
+                        display: flex;
+                        align-items: center;
+                        gap: 6px;
+                    ">
+                        👁️ View Items
+                    </button>
+                </div>
             </div>
+            
+            <!-- Expandable Task Details -->
             <div class="group-tasks" style="display: none; margin-top: 20px; border-top: 1px solid #e5e7eb; padding-top: 20px;">
                 ${group.tasks.map(task => `
-                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #f8fafc; border-radius: 6px; margin-bottom: 10px; border-left: 3px solid #3b82f6;">
-                        <div style="flex: 1;">
-                            <div style="font-weight: 600; color: #1e293b; margin-bottom: 4px;">
-                                ${task.jobDetails.itemCode} - ${task.jobDetails.customerName}
-                            </div>
-                            <div style="color: #64748b; font-size: 0.9rem; margin-bottom: 4px;">
-                                ${task.jobDetails.description}
-                            </div>
-                            <div style="font-size: 0.8rem; color: #64748b;">
-                                Qty: ${task.jobDetails.qty} | Due: ${new Date(task.dueDate).toLocaleDateString()}
+                    <div class="task-item" data-task-id="${task._id}" style="
+                        display: flex; 
+                        justify-content: space-between; 
+                        align-items: center; 
+                        padding: 12px; 
+                        background: #f8fafc; 
+                        border-radius: 8px; 
+                        margin-bottom: 10px;
+                        border: 1px solid #e5e7eb;
+                        transition: all 0.2s ease;
+                    ">
+                        <div style="display: flex; align-items: center; flex: 1;">
+                            <input type="checkbox" class="task-checkbox" data-task-id="${task._id}" style="display: none;">
+                            <div style="flex: 1;">
+                                <div style="font-weight: 600; color: #1e293b; margin-bottom: 4px;">
+                                    ${task.itemCode} - ${task.description}
+                                </div>
+                                <div style="font-size: 0.85rem; color: #64748b;">
+                                    Qty: ${task.qty} | Due: ${new Date(task.dueDate).toLocaleDateString()}
+                                </div>
                             </div>
                         </div>
-                        <div style="display: flex; gap: 8px;">
+                        <div style="display: flex; align-items: center; gap: 8px;">
                             ${task.status === 'pending' ? `
                                 <button class="btn-small btn-success" onclick="completeTask('${task._id}')" style="padding: 6px 12px; font-size: 0.8rem;">
                                     Complete
                                 </button>
                             ` : `
-                                <span style="padding: 4px 8px; background: #dcfce7; color: #166534; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">
-                                    ${task.status.toUpperCase()}
+                                <span style="
+                                    padding: 4px 8px; 
+                                    background: ${task.status === 'completed' ? '#dcfce7' : '#dbeafe'}; 
+                                    color: ${task.status === 'completed' ? '#166534' : '#1e40af'}; 
+                                    border-radius: 6px; 
+                                    font-size: 0.7rem; 
+                                    font-weight: 600;
+                                ">
+                                    ${task.status.replace('_', ' ').toUpperCase()}
                                 </span>
                             `}
-                            <button class="btn-small btn-primary" onclick="viewTaskDetails('${task._id}')" style="padding: 6px 12px; font-size: 0.8rem;">
-                                Details
+                            <button class="btn-small btn-primary" onclick="viewTaskDetails('${task._id}')" 
+                                    style="padding: 6px 10px; font-size: 0.75rem; border-radius: 6px;">
+                                👁️
                             </button>
                         </div>
                     </div>
@@ -927,11 +1044,15 @@ document.addEventListener('DOMContentLoaded', function () {
             </div>
         `;
 
-            groupCard.addEventListener('click', function (e) {
-                if (e.target.tagName !== 'BUTTON') {
-                    const tasksDiv = this.querySelector('.group-tasks');
-                    tasksDiv.style.display = tasksDiv.style.display === 'none' ? 'block' : 'none';
-                }
+            // Add click handlers
+            const expandBtn = groupCard.querySelector('.expand-btn');
+            const tasksDiv = groupCard.querySelector('.group-tasks');
+
+            expandBtn.addEventListener('click', function () {
+                const isHidden = tasksDiv.style.display === 'none';
+                tasksDiv.style.display = isHidden ? 'block' : 'none';
+                expandBtn.innerHTML = isHidden ? '👁️ Hide Items' : '👁️ View Items';
+                expandBtn.style.background = isHidden ? '#1e40af' : '#3b82f6';
             });
 
             container.appendChild(groupCard);
@@ -1451,6 +1572,112 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    // Exit selection mode
+    function exitSelectionMode() {
+        isSelectionMode = false;
+        selectedTasks.clear();
+
+        const container = document.getElementById('jobEntryTasksContainer');
+        const selectionBtn = document.getElementById('selectionModeBtn');
+        const completeBtn = document.getElementById('completeSelectedBtn');
+        const cancelBtn = document.getElementById('cancelSelectionBtn');
+        const selectionInfo = document.getElementById('selectionInfo');
+
+        container.classList.remove('task-selection-mode');
+        selectionBtn.style.display = 'block';
+        completeBtn.style.display = 'none';
+        cancelBtn.style.display = 'none';
+        selectionInfo.style.display = 'none';
+
+        // Hide all checkboxes and remove selection styling
+        document.querySelectorAll('.task-checkbox').forEach(checkbox => {
+            checkbox.style.display = 'none';
+            checkbox.checked = false;
+            checkbox.removeEventListener('change', handleTaskSelection);
+        });
+
+        document.querySelectorAll('.task-item').forEach(item => {
+            item.classList.remove('selected');
+        });
+
+        updateSelectionCounter();
+    }
+
+    function handleTaskSelection(event) {
+        const taskId = event.target.dataset.taskId;
+        const taskItem = event.target.closest('.task-item');
+
+        if (event.target.checked) {
+            selectedTasks.add(taskId);
+            taskItem.classList.add('selected');
+        } else {
+            selectedTasks.delete(taskId);
+            taskItem.classList.remove('selected');
+        }
+
+        updateSelectionCounter();
+    }
+
+    // Update selection counter
+    function updateSelectionCounter() {
+        const count = selectedTasks.size;
+        document.getElementById('selectedCount').textContent = count;
+        document.getElementById('selectedTasksCount').textContent = count;
+
+        const completeBtn = document.getElementById('completeSelectedBtn');
+        completeBtn.disabled = count === 0;
+        completeBtn.style.opacity = count === 0 ? '0.5' : '1';
+    }
+
+    function populateSelectedTasksModal() {
+        const selectedTasksList = document.getElementById('selectedTasksList');
+        selectedTasksList.innerHTML = '';
+
+        selectedTasks.forEach(taskId => {
+            const task = tasks.find(t => t._id === taskId);
+            if (task) {
+                const taskDiv = document.createElement('div');
+                taskDiv.className = 'selected-task-item';
+                taskDiv.innerHTML = `
+                <div>
+                    <strong>${task.itemCode}</strong> - ${task.description}
+                    <br><small>Doc: ${task.docNo} | Qty: ${task.qty}</small>
+                </div>
+                <button class="remove-task-btn" onclick="removeSelectedTask('${taskId}')">Remove</button>
+            `;
+                selectedTasksList.appendChild(taskDiv);
+            }
+        });
+    }
+
+    window.removeSelectedTask = function (taskId) {
+        selectedTasks.delete(taskId);
+        const checkbox = document.querySelector(`input[data-task-id="${taskId}"]`);
+        if (checkbox) {
+            checkbox.checked = false;
+            checkbox.closest('.task-item').classList.remove('selected');
+        }
+        updateSelectionCounter();
+        populateSelectedTasksModal();
+
+        if (selectedTasks.size === 0) {
+            closeModal('completeMultipleTasksModal');
+            showMessage('No tasks selected', 'info');
+        }
+    };
+
+    window.completeSelectedTasks = function () {
+        if (selectedTasks.size === 0) {
+            showMessage('Please select at least one task to complete', 'warning');
+            return;
+        }
+
+        // Populate the modal with selected tasks
+        populateSelectedTasksModal();
+        openModal('completeMultipleTasksModal');
+    };
+
+
     // Global functions
     window.completeTask = function (taskId) {
         // Add validation to ensure taskId is valid
@@ -1473,6 +1700,43 @@ document.addEventListener('DOMContentLoaded', function () {
         document.querySelector('.modal').remove();
         completeTask(taskId);
     };
+
+    window.toggleSelectionMode = function () {
+        isSelectionMode = !isSelectionMode;
+        const container = document.getElementById('jobEntryTasksContainer');
+        const selectionBtn = document.getElementById('selectionModeBtn');
+        const completeBtn = document.getElementById('completeSelectedBtn');
+        const cancelBtn = document.getElementById('cancelSelectionBtn');
+        const selectionInfo = document.getElementById('selectionInfo');
+
+        if (isSelectionMode) {
+            // Enter selection mode
+            container.classList.add('task-selection-mode');
+            selectionBtn.style.display = 'none';
+            completeBtn.style.display = 'block';
+            cancelBtn.style.display = 'block';
+            selectionInfo.style.display = 'block';
+
+            // Show all checkboxes
+            document.querySelectorAll('.task-checkbox').forEach(checkbox => {
+                checkbox.style.display = 'block';
+                checkbox.addEventListener('change', handleTaskSelection);
+            });
+
+            showMessage('Selection mode enabled. Check tasks to complete multiple at once.', 'info');
+        } else {
+            // Exit selection mode
+            exitSelectionMode();
+        }
+    };
+
+    // Cancel selection
+    window.cancelSelection = function () {
+        exitSelectionMode();
+        showMessage('Selection cancelled', 'info');
+    };
+
+
 
     // View task details from due date modal
     window.viewTaskDetailsFromDueDate = function (taskId) {
@@ -1573,6 +1837,83 @@ document.addEventListener('DOMContentLoaded', function () {
         } catch (error) {
             showMessage('Error completing task', 'error');
         }
+    });
+
+    document.getElementById('completeMultipleTasksForm').addEventListener('submit', async function (e) {
+        e.preventDefault();
+
+        if (selectedTasks.size === 0) {
+            showMessage('No tasks selected', 'error');
+            return;
+        }
+
+        const formData = new FormData(e.target);
+        const remarks = formData.get('remarks');
+        const attachment = formData.get('attachment');
+
+        const confirmMessage = `Are you sure you want to complete ${selectedTasks.size} selected tasks?`;
+        if (!confirm(confirmMessage)) {
+            return;
+        }
+
+        // Show loading state
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        const originalText = submitBtn.textContent;
+        submitBtn.textContent = 'Completing...';
+        submitBtn.disabled = true;
+
+        let successCount = 0;
+        let errorCount = 0;
+
+        // Complete each selected task
+        for (const taskId of selectedTasks) {
+            try {
+                const completionData = {
+                    remarks: remarks,
+                    attachments: attachment ? [attachment.name] : []
+                };
+
+                const response = await fetch(`${API_URL}/tasks/${taskId}/complete`, {
+                    method: 'POST',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify(completionData)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    successCount++;
+                } else {
+                    errorCount++;
+                    console.error('Failed to complete task:', taskId, result.error);
+                }
+            } catch (error) {
+                errorCount++;
+                console.error('Error completing task:', taskId, error);
+            }
+        }
+
+        // Show results
+        if (successCount > 0) {
+            showMessage(
+                `Successfully completed ${successCount} tasks${errorCount > 0 ? `, ${errorCount} failed` : ''}`,
+                errorCount > 0 ? 'warning' : 'success'
+            );
+
+            // Close modal and reset
+            closeModal('completeMultipleTasksModal');
+            exitSelectionMode();
+
+            // Reload tasks
+            await loadTasks();
+            loadSectionData('job-entry');
+        } else {
+            showMessage('Failed to complete any tasks', 'error');
+        }
+
+        // Reset button
+        submitBtn.textContent = originalText;
+        submitBtn.disabled = false;
     });
 
     document.getElementById('assignPeerTaskForm').addEventListener('submit', async function (e) {
