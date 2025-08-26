@@ -6,8 +6,8 @@ document.addEventListener('DOMContentLoaded', function () {
     let tasks = [];
     let filteredTasks = [];
     let filteredJobs = [];
-    // const API_URL = 'https://atpl-daily-task-management.onrender.com/api';
-    const API_URL = 'http://localhost:3000/api';
+    const API_URL = 'https://atpl-daily-task-management.onrender.com/api';
+    // const API_URL = 'http://localhost:3000/api';
 
     // Check authentication
     checkAuth();

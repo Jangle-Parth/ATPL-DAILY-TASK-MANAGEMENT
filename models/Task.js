@@ -92,5 +92,18 @@ taskSchema.index({ dueDate: 1 });
 taskSchema.index({ docNo: 1 });
 taskSchema.index({ customerName: 1 });
 taskSchema.index({ createdAt: -1 });
+// In Task model
+taskSchema.index({
+    jobId: 1,
+    'jobDetails.currentStage': 1,
+    'jobDetails.nextStage': 1,
+    status: 1
+}, {
+    unique: true,
+    partialFilterExpression: {
+        status: { $in: ['pending', 'pending_approval'] },
+        type: 'job-auto'
+    }
+});
 
 module.exports = mongoose.model('Task', taskSchema);
