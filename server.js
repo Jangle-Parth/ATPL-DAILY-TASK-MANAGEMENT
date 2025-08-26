@@ -2439,11 +2439,37 @@ app.put('/api/jobs/:id/status', requireAdmin, async (req, res) => {
         const flowInfo = statusFlow[statusKey];
 
         if (flowInfo) {
-            const departmentUsers = await getUsersByDepartment(flowInfo.stage);
-            if (departmentUsers.length > 0) {
-                await createAutoTask(job, status, departmentUsers[0]._id);
+            try {
+                // ADDED: Check for existing tasks before creating new ones
+                const existingTask = await Task.findOne({
+                    title: flowInfo.nextTask,
+                    'jobDetails.docNo': docNo.toString(),
+                    'jobDetails.customerName': customerName.toString(),
+                    'jobDetails.currentStage': flowInfo.stage,
+                    'jobDetails.nextStage': flowInfo.next,
+                    status: { $in: ['pending', 'pending_approval'] },
+                    type: 'job-auto',
+                    // Only check for recent tasks (within last 24 hours) to avoid blocking future legitimate tasks
+                    createdAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) }
+                });
+
+                if (existingTask) {
+                    console.log(`🚫 Skipping task creation - similar task exists for ${docNo} - ${customerName} at ${flowInfo.stage}`);
+                } else {
+                    const departmentUsers = await getUsersByDepartment(flowInfo.stage);
+                    if (departmentUsers.length > 0) {
+                        await createAutoTask(job, status, departmentUsers[0]._id);
+                        console.log(`✅ Auto task created for job ${docNo}`);
+                    } else {
+                        console.log(`⚠️ No users found for department: ${flowInfo.stage}`);
+                    }
+                }
+            } catch (taskError) {
+                console.error('Error creating auto task:', taskError);
+                // Don't fail the job creation if auto task fails
             }
         }
+
 
         await logActivity('JOB_STATUS_UPDATED', req.userId,
             `Updated job ${job.docNo} status from ${oldStatus} to ${status} `, req);
