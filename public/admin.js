@@ -2742,34 +2742,6 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    async function handleAddTask(e) {
-        e.preventDefault();
-
-        const formData = new FormData(e.target);
-        const taskData = Object.fromEntries(formData.entries());
-
-        try {
-            const response = await fetch(`${API_URL}/tasks`, {
-                method: 'POST',
-                headers: getAuthHeaders(),
-                body: JSON.stringify(taskData)
-            });
-
-            const result = await response.json();
-
-            if (result.success) {
-                showMessage('Task created successfully', 'success');
-                closeModal('addTaskModal');
-                e.target.reset();
-                loadTasks();
-            } else {
-                showMessage(result.error, 'error');
-            }
-        } catch (error) {
-            showMessage('Error creating task', 'error');
-        }
-    }
-
     // FIXED: Improved task approval function
     window.approveTask = async function (taskId) {
         if (!confirm('Are you sure you want to approve this task?')) return;

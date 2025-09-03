@@ -1351,7 +1351,7 @@ app.post('/api/tasks', requireAuth, async (req, res) => {
         };
 
         const task = await Task.create(taskData);
-
+        const assignees = await User.find({ _id: { $in: assigneeIds } });
         for (const assignee of assignees) {
             await emailService.sendTaskAssignmentEmail(assignee, task, user);
         }
