@@ -4,8 +4,8 @@ document.addEventListener('DOMContentLoaded', function () {
     let isSelectionMode = false;
     let selectedTasks = new Set();
     let searchResults = [];
-    const API_URL = 'https://atpl-daily-task-management.onrender.com/api';
-    // const API_URL = 'http://localhost:3000/api';
+    // const API_URL = 'https://atpl-daily-task-management.onrender.com/api';
+    const API_URL = 'http://localhost:3000/api';
     let users = [];
     const groupedTaskStyles = `
 <style>
@@ -773,7 +773,7 @@ document.addEventListener('DOMContentLoaded', function () {
         <!-- COMPACT Description -->
         <div style="color: #475569; margin-bottom: 8px; font-size: 0.8rem; line-height: 1.3; 
                     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
-            ${task.description}
+            ${task.type === 'job-auto' ? '' : task.description}
         </div>
 
         ${jobDescription}
