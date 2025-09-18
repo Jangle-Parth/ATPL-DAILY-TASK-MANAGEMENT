@@ -4,8 +4,11 @@ document.addEventListener('DOMContentLoaded', function () {
     let isSelectionMode = false;
     let selectedTasks = new Set();
     let searchResults = [];
-    // const API_URL = 'https://atpl-daily-task-management.onrender.com/api';
-    const API_URL = 'http://localhost:3000/api';
+    let completedTasks = [];
+    let completedTasksPage = 1;
+    let completedTasksHasMore = true;
+    const API_URL = 'https://atpl-daily-task-management.onrender.com/api';
+    // const API_URL = 'http://localhost:3000/api';
     let users = [];
     const groupedTaskStyles = `
 <style>
@@ -91,6 +94,42 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
+    const completedTypeFilter = document.getElementById('completedTasksTypeFilter');
+    const completedPeriodFilter = document.getElementById('completedTasksPeriodFilter');
+    const refreshCompletedBtn = document.getElementById('refreshCompletedTasks');
+    const loadMoreBtn = document.getElementById('loadMoreCompletedTasks');
+
+    if (completedTypeFilter) {
+        completedTypeFilter.addEventListener('change', () => {
+            completedTasksPage = 1;
+            completedTasks = [];
+            loadCompletedTasks();
+        });
+    }
+
+    if (completedPeriodFilter) {
+        completedPeriodFilter.addEventListener('change', () => {
+            completedTasksPage = 1;
+            completedTasks = [];
+            loadCompletedTasks();
+        });
+    }
+
+    if (refreshCompletedBtn) {
+        refreshCompletedBtn.addEventListener('click', () => {
+            completedTasksPage = 1;
+            completedTasks = [];
+            loadCompletedTasks();
+        });
+    }
+
+    if (loadMoreBtn) {
+        loadMoreBtn.addEventListener('click', () => {
+            completedTasksPage++;
+            loadCompletedTasks();
+        });
+    }
+
 
     // Event listeners
     document.getElementById('logoutBtn').addEventListener('click', logout);
@@ -159,6 +198,81 @@ document.addEventListener('DOMContentLoaded', function () {
                 element.textContent = 'Loading...';
             }
         });
+    }
+
+    function viewCompletedTaskDetails(taskId) {
+        const task = completedTasks.find(t => t._id === taskId);
+        if (!task) return;
+
+        // Create and show modal with full task details
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.style.display = 'block';
+
+        const completedDate = new Date(task.approvedAt).toLocaleString();
+        const dueDate = new Date(task.originalDueDate).toLocaleString();
+        const createdDate = new Date(task.originalCreatedAt).toLocaleString();
+
+        modal.innerHTML = `
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Completed Task Details</h3>
+                <button class="close-btn" onclick="this.closest('.modal').remove()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="task-detail-grid">
+                    <div class="detail-item">
+                        <label>Title:</label>
+                        <span>${task.title}</span>
+                    </div>
+                    <div class="detail-item">
+                        <label>Description:</label>
+                        <span>${task.description}</span>
+                    </div>
+                    <div class="detail-item">
+                        <label>Type:</label>
+                        <span class="badge badge-${task.type}">${task.type}</span>
+                    </div>
+                    <div class="detail-item">
+                        <label>Priority:</label>
+                        <span class="badge priority-${task.priority}">${task.priority}</span>
+                    </div>
+                    <div class="detail-item">
+                        <label>Created:</label>
+                        <span>${createdDate}</span>
+                    </div>
+                    <div class="detail-item">
+                        <label>Due Date:</label>
+                        <span>${dueDate}</span>
+                    </div>
+                    <div class="detail-item">
+                        <label>Completed:</label>
+                        <span>${completedDate}</span>
+                    </div>
+                    <div class="detail-item">
+                        <label>Days to Complete:</label>
+                        <span>${task.completionDays} days</span>
+                    </div>
+                    <div class="detail-item">
+                        <label>On Time:</label>
+                        <span class="badge ${task.wasOnTime ? 'on-time' : 'late'}">
+                            ${task.wasOnTime ? 'Yes' : 'No'}
+                        </span>
+                    </div>
+                    ${task.completionRemarks ? `
+                        <div class="detail-item full-width">
+                            <label>Completion Remarks:</label>
+                            <span>${task.completionRemarks}</span>
+                        </div>
+                    ` : ''}
+                </div>
+            </div>
+        </div>
+    `;
+
+        document.body.appendChild(modal);
     }
 
     // Call initially
@@ -1683,6 +1797,9 @@ document.addEventListener('DOMContentLoaded', function () {
             case 'my-assigned-tasks': // NEW
                 renderMyAssignedTasks();
                 break;
+            case 'completed-tasks':
+                loadCompletedTasks();
+                break;
             case 'due-dates':
                 loadDashboardStats();
                 break;
@@ -1932,6 +2049,175 @@ document.addEventListener('DOMContentLoaded', function () {
 
         return card;
     }
+
+    async function loadCompletedTasks() {
+        try {
+            const typeFilter = document.getElementById('completedTasksTypeFilter')?.value || 'all';
+            const periodFilter = document.getElementById('completedTasksPeriodFilter')?.value || '30';
+
+            // Calculate date range
+            const endDate = new Date();
+            const startDate = new Date();
+            startDate.setDate(startDate.getDate() - parseInt(periodFilter));
+
+            const queryParams = new URLSearchParams({
+                page: completedTasksPage,
+                limit: 20,
+                type: typeFilter,
+                startDate: startDate.toISOString(),
+                endDate: endDate.toISOString()
+            });
+
+            const response = await fetch(`${API_URL}/completed-tasks?${queryParams}`, {
+                headers: getAuthHeaders()
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                if (completedTasksPage === 1) {
+                    completedTasks = data.completedTasks;
+                } else {
+                    completedTasks = [...completedTasks, ...data.completedTasks];
+                }
+
+                completedTasksHasMore = data.pagination.hasMore;
+                renderCompletedTasks();
+                loadCompletedTasksStats();
+
+                // Show/hide load more button
+                const loadMoreContainer = document.querySelector('.load-more-container');
+                if (loadMoreContainer) {
+                    loadMoreContainer.style.display = completedTasksHasMore ? 'block' : 'none';
+                }
+            }
+        } catch (error) {
+            console.error('Error loading completed tasks:', error);
+            showMessage('Error loading completed tasks', 'error');
+        }
+    }
+
+    async function loadCompletedTasksStats() {
+        try {
+            const periodFilter = document.getElementById('completedTasksPeriodFilter')?.value || '30';
+
+            const response = await fetch(`${API_URL}/completed-tasks/stats?period=${periodFilter}`, {
+                headers: getAuthHeaders()
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                updateCompletedTasksStats(data.stats);
+            }
+        } catch (error) {
+            console.error('Error loading completed tasks stats:', error);
+        }
+    }
+
+    function updateCompletedTasksStats(stats) {
+        document.getElementById('completedStatsTotal').textContent = stats.totalCompleted;
+        document.getElementById('completedStatsOnTime').textContent = `${stats.onTimeRate}% on time`;
+        document.getElementById('completedStatsAvgDays').textContent = stats.averageCompletionDays;
+    }
+
+    function renderCompletedTasks() {
+        const container = document.getElementById('completedTasksContainer');
+        if (!container) return;
+
+        if (completedTasks.length === 0) {
+            container.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-state-icon">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <h3>No Completed Tasks</h3>
+                <p>You don't have any completed tasks for the selected period.</p>
+            </div>
+        `;
+            return;
+        }
+
+        const tasksHTML = completedTasks.map(task => createCompletedTaskCard(task)).join('');
+        container.innerHTML = `
+        <div class="tasks-grid">
+            ${tasksHTML}
+        </div>
+    `;
+    }
+
+    function createCompletedTaskCard(task) {
+        const completedDate = new Date(task.approvedAt);
+        const dueDate = new Date(task.originalDueDate);
+        const wasOnTime = task.wasOnTime;
+
+        const assignedToNames = Array.isArray(task.assignedTo)
+            ? task.assignedTo.map(user => user.username || user.email || 'Unknown').join(', ')
+            : (task.assignedTo?.username || task.assignedTo?.email || 'Unknown');
+
+        const priorityClass = `priority-${task.priority}`;
+        const onTimeClass = wasOnTime ? 'on-time' : 'late';
+
+        return `
+        <div class="task-card completed-task ${priorityClass}">
+            <div class="task-header">
+                <div class="task-title">${task.title}</div>
+                <div class="task-badges">
+                    <span class="badge badge-${task.type}">${task.type}</span>
+                    <span class="badge ${onTimeClass}">
+                        ${wasOnTime ? 'On Time' : 'Late'}
+                    </span>
+                </div>
+            </div>
+            
+            <div class="task-description">
+                ${task.description}
+            </div>
+            
+            ${task.jobDetails ? `
+                <div class="task-job-info">
+                    <div class="job-detail">
+                        <strong>Job:</strong> ${task.jobDetails.docNo}
+                    </div>
+                    <div class="job-detail">
+                        <strong>Customer:</strong> ${task.jobDetails.customerName}
+                    </div>
+                </div>
+            ` : ''}
+            
+            <div class="task-meta">
+                <div class="task-assignee">
+                    <i class="fas fa-user"></i>
+                    <span>Assigned to: ${assignedToNames}</span>
+                </div>
+                <div class="task-completion-info">
+                    <div class="completion-date">
+                        <i class="fas fa-check"></i>
+                        <span>Completed: ${completedDate.toLocaleDateString()}</span>
+                    </div>
+                    <div class="completion-days">
+                        <i class="fas fa-clock"></i>
+                        <span>${task.completionDays} days to complete</span>
+                    </div>
+                </div>
+            </div>
+            
+            ${task.completionRemarks ? `
+                <div class="task-remarks">
+                    <strong>Remarks:</strong> ${task.completionRemarks}
+                </div>
+            ` : ''}
+            
+            <div class="task-actions">
+                <button class="btn btn-sm btn-secondary" onclick="viewCompletedTaskDetails('${task._id}')">
+                    <i class="fas fa-eye"></i>
+                    View Details
+                </button>
+            </div>
+        </div>
+    `;
+    }
+
 
     // NEW: Approve task assigned by current user
     window.approveMyTask = async function (taskId) {

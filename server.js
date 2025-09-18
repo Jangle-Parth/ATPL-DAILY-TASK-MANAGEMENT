@@ -10,6 +10,7 @@ const jwt = require('jsonwebtoken');
 const emailService = require('./services/emailService');
 const cronService = require('./services/cronService');
 cronService.init();
+const mongoose = require('mongoose');
 
 // Database connection
 const connectDB = require('./config/database');
@@ -20,6 +21,7 @@ const User = require('./models/User');
 const Task = require('./models/Task');
 const Job = require('./models/Job');
 const Log = require('./models/Log');
+const CompletedTask = require('./models/CompletedTask');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -1426,7 +1428,6 @@ app.post('/api/tasks', requireAuth, async (req, res) => {
     }
 });
 
-// In server.js - Update task completion
 
 app.post('/api/tasks/:id/complete', requireAuth, async (req, res) => {
     try {
@@ -1739,7 +1740,7 @@ app.post('/api/tasks/:id/approve', requireAuth, async (req, res) => {
             return res.status(400).json({ error: 'Invalid task ID' });
         }
 
-        const task = await Task.findById(taskId);
+        const task = await Task.findById(taskId)
 
         if (!task) {
             return res.status(404).json({ error: 'Task not found' });
@@ -1782,13 +1783,168 @@ app.post('/api/tasks/:id/approve', requireAuth, async (req, res) => {
 
         await task.save();
 
-        await logActivity('TASK_APPROVED', req.userId, `Approved task: ${task.title} `, req);
-        res.json({ success: true, message: 'Task approved successfully' });
+        // Calculate completion metrics
+        const originalCreatedAt = new Date(task.createdAt);
+        const completedAt = new Date(task.completedAt);
+        const approvedAt = new Date();
+        const dueDate = new Date(task.dueDate);
+
+        const completionDays = Math.ceil((completedAt - originalCreatedAt) / (1000 * 60 * 60 * 24));
+        const wasOnTime = completedAt <= dueDate;
+
+        // Create completed task record
+        const completedTaskData = {
+            originalTaskId: task._id,
+            title: task.title,
+            description: task.description,
+            assignedTo: task.assignedTo,
+            assignedBy: task.assignedBy,
+            priority: task.priority,
+            type: task.type,
+            jobId: task.jobId,
+            jobDetails: task.jobDetails,
+            completedAt: task.completedAt,
+            approvedAt: approvedAt,
+            approvedBy: req.userId,
+            completionRemarks: task.completionRemarks,
+            completionAttachments: task.completionAttachments || [],
+            originalDueDate: task.dueDate,
+            originalCreatedAt: task.createdAt,
+            completionDays: completionDays,
+            wasOnTime: wasOnTime
+        };
+
+        await CompletedTask.create(completedTaskData);
+
+        // Remove from active tasks
+        await Task.findByIdAndDelete(taskId);
+
+
+
+
+        res.json({
+            success: true,
+            message: 'Task approved and moved to completed tasks'
+        });
+
+
     } catch (error) {
-        console.error('Error approving task:', error);
-        res.status(500).json({ error: 'Error approving task' });
+        console.error('Error in task approval:', error);
+        res.status(500).json({ error: 'Error processing task approval' });
     }
 });
+
+app.get('/api/completed-tasks', requireAuth, async (req, res) => {
+    try {
+        const { page = 1, limit = 20, type, startDate, endDate } = req.query;
+        const userId = req.userId;
+
+        let query = { assignedTo: userId };
+
+        // Add filters
+        if (type && type !== 'all') {
+            query.type = type;
+        }
+
+        if (startDate && endDate) {
+            query.approvedAt = {
+                $gte: new Date(startDate),
+                $lte: new Date(endDate)
+            };
+        }
+
+        const completedTasks = await CompletedTask.find(query)
+            .populate('assignedTo', 'username email')
+            .populate('assignedBy', 'username email')
+            .populate('approvedBy', 'username email')
+            .sort({ approvedAt: -1 })
+            .limit(limit * 1)
+            .skip((page - 1) * limit);
+
+        const total = await CompletedTask.countDocuments(query);
+
+        res.json({
+            success: true,
+            completedTasks: completedTasks,
+            pagination: {
+                currentPage: parseInt(page),
+                totalPages: Math.ceil(total / limit),
+                totalTasks: total,
+                hasMore: page * limit < total
+            }
+        });
+
+    } catch (error) {
+        console.error('Error fetching completed tasks:', error);
+        res.status(500).json({ error: 'Error fetching completed tasks' });
+    }
+});
+
+app.get('/api/completed-tasks/stats', requireAuth, async (req, res) => {
+    try {
+        const userId = req.userId;
+        const { period = '30' } = req.query; // days
+
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - parseInt(period));
+
+        const stats = await CompletedTask.aggregate([
+            {
+                $match: {
+                    assignedTo: new mongoose.Types.ObjectId(userId),
+                    approvedAt: { $gte: startDate }
+                }
+            },
+            {
+                $group: {
+                    _id: null,
+                    totalCompleted: { $sum: 1 },
+                    onTimeCompletions: {
+                        $sum: { $cond: ['$wasOnTime', 1, 0] }
+                    },
+                    averageCompletionDays: { $avg: '$completionDays' },
+                    typeDistribution: {
+                        $push: '$type'
+                    }
+                }
+            }
+        ]);
+
+        const result = stats[0] || {
+            totalCompleted: 0,
+            onTimeCompletions: 0,
+            averageCompletionDays: 0,
+            typeDistribution: []
+        };
+
+        // Calculate type distribution
+        const typeCount = {};
+        result.typeDistribution.forEach(type => {
+            typeCount[type] = (typeCount[type] || 0) + 1;
+        });
+
+        const onTimeRate = result.totalCompleted > 0
+            ? (result.onTimeCompletions / result.totalCompleted * 100).toFixed(1)
+            : 0;
+
+        res.json({
+            success: true,
+            stats: {
+                totalCompleted: result.totalCompleted,
+                onTimeCompletions: result.onTimeCompletions,
+                onTimeRate: parseFloat(onTimeRate),
+                averageCompletionDays: Math.round(result.averageCompletionDays || 0),
+                typeDistribution: typeCount,
+                period: parseInt(period)
+            }
+        });
+
+    } catch (error) {
+        console.error('Error fetching completed tasks stats:', error);
+        res.status(500).json({ error: 'Error fetching statistics' });
+    }
+});
+
 
 app.get('/api/analytics/due-dates', requireAuth, async (req, res) => {
     try {
@@ -2101,6 +2257,173 @@ app.get('/api/search', requireAuth, async (req, res) => {
 // Dashboard Routes
 // Update your server.js dashboard endpoint to include pending_approval
 
+app.get('/api/dashboard/user', requireAuth, async (req, res) => {
+    try {
+        const userId = req.userId;
+
+        // Get user's tasks
+        const userTasks = await Task.find({
+            $or: [
+                { assignedTo: userId },
+                { assignedTo: { $in: [userId] } }
+            ]
+        }).populate('assignedTo', 'username email')
+            .populate('assignedBy', 'username email');
+
+        // Calculate stats
+        const totalTasks = userTasks.length;
+        const completedTasks = userTasks.filter(t => t.status === 'completed').length;
+        const pendingTasks = userTasks.filter(t => t.status === 'pending').length;
+        const pendingApprovalTasks = userTasks.filter(t => t.status === 'pending_approval').length;
+
+        const today = new Date();
+        const overdueTasks = userTasks.filter(t =>
+            (t.status === 'pending' || t.status === 'pending_approval') &&
+            new Date(t.dueDate) < today
+        ).length;
+
+        // Get recent tasks
+        const recentTasks = userTasks
+            .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+            .slice(0, 5);
+
+        // Get due today tasks
+        const dueTodayTasks = userTasks.filter(t => {
+            if (t.status === 'completed') return false;
+            const dueDate = new Date(t.dueDate);
+            return dueDate.toDateString() === today.toDateString();
+        });
+
+        // Get due this week tasks
+        const weekEnd = new Date(today);
+        weekEnd.setDate(weekEnd.getDate() + 7);
+
+        const dueThisWeekTasks = userTasks.filter(t => {
+            if (t.status === 'completed') return false;
+            const dueDate = new Date(t.dueDate);
+            return dueDate >= today && dueDate <= weekEnd;
+        });
+
+        const dashboardData = {
+            stats: {
+                totalTasks,
+                completedTasks,
+                pendingTasks,
+                pendingApprovalTasks,
+                overdueTasks,
+                completionRate: totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0
+            },
+            recentTasks: recentTasks,
+            dueTasks: {
+                today: dueTodayTasks.slice(0, 5),
+                thisWeek: dueThisWeekTasks.slice(0, 10)
+            },
+            performance: {
+                onTimeCompletions: userTasks.filter(t =>
+                    t.status === 'completed' &&
+                    t.completedAt &&
+                    new Date(t.completedAt) <= new Date(t.dueDate)
+                ).length,
+                totalCompletions: completedTasks
+            }
+        };
+
+        res.json({
+            success: true,
+            data: dashboardData
+        });
+
+    } catch (error) {
+        console.error('Error loading user dashboard:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Error loading dashboard data'
+        });
+    }
+}); app.get('/api/dashboard/user', requireAuth, async (req, res) => {
+    try {
+        const userId = req.userId;
+
+        // Get user's tasks
+        const userTasks = await Task.find({
+            $or: [
+                { assignedTo: userId },
+                { assignedTo: { $in: [userId] } }
+            ]
+        }).populate('assignedTo', 'username email')
+            .populate('assignedBy', 'username email');
+
+        // Calculate stats
+        const totalTasks = userTasks.length;
+        const completedTasks = userTasks.filter(t => t.status === 'completed').length;
+        const pendingTasks = userTasks.filter(t => t.status === 'pending').length;
+        const pendingApprovalTasks = userTasks.filter(t => t.status === 'pending_approval').length;
+
+        const today = new Date();
+        const overdueTasks = userTasks.filter(t =>
+            (t.status === 'pending' || t.status === 'pending_approval') &&
+            new Date(t.dueDate) < today
+        ).length;
+
+        // Get recent tasks
+        const recentTasks = userTasks
+            .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+            .slice(0, 5);
+
+        // Get due today tasks
+        const dueTodayTasks = userTasks.filter(t => {
+            if (t.status === 'completed') return false;
+            const dueDate = new Date(t.dueDate);
+            return dueDate.toDateString() === today.toDateString();
+        });
+
+        // Get due this week tasks
+        const weekEnd = new Date(today);
+        weekEnd.setDate(weekEnd.getDate() + 7);
+
+        const dueThisWeekTasks = userTasks.filter(t => {
+            if (t.status === 'completed') return false;
+            const dueDate = new Date(t.dueDate);
+            return dueDate >= today && dueDate <= weekEnd;
+        });
+
+        const dashboardData = {
+            stats: {
+                totalTasks,
+                completedTasks,
+                pendingTasks,
+                pendingApprovalTasks,
+                overdueTasks,
+                completionRate: totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0
+            },
+            recentTasks: recentTasks,
+            dueTasks: {
+                today: dueTodayTasks.slice(0, 5),
+                thisWeek: dueThisWeekTasks.slice(0, 10)
+            },
+            performance: {
+                onTimeCompletions: userTasks.filter(t =>
+                    t.status === 'completed' &&
+                    t.completedAt &&
+                    new Date(t.completedAt) <= new Date(t.dueDate)
+                ).length,
+                totalCompletions: completedTasks
+            }
+        };
+
+        res.json({
+            success: true,
+            data: dashboardData
+        });
+
+    } catch (error) {
+        console.error('Error loading user dashboard:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Error loading dashboard data'
+        });
+    }
+});
 app.get('/api/dashboard', requireAuth, async (req, res) => {
     try {
         const userTasks = await Task.find({

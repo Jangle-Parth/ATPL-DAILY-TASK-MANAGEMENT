@@ -183,6 +183,72 @@
     min-width: fit-content;
 }
 
+.completed-tasks-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.completed-task {
+    border-left: 4px solid var(--success);
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(16, 185, 129, 0.02) 100%);
+}
+
+.completed-task .task-header {
+    border-bottom: 1px solid rgba(16, 185, 129, 0.1);
+}
+
+.badge.on-time {
+    background: var(--success);
+    color: white;
+}
+
+.badge.late {
+    background: var(--warning);
+    color: white;
+}
+
+.task-completion-info {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+    color: var(--gray-600);
+}
+
+.task-completion-info i {
+    margin-right: 0.5rem;
+    color: var(--success);
+}
+
+.task-detail-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.detail-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.detail-item.full-width {
+    grid-column: 1 / -1;
+}
+
+.detail-item label {
+    font-weight: 600;
+    color: var(--gray-700);
+    font-size: 0.9rem;
+}
+
+.load-more-container {
+    text-align: center;
+    margin-top: 2rem;
+}
+
         .nav-tab:hover {
             background: white;
             color: var(--primary);
@@ -2179,6 +2245,10 @@
                         <i class="fas fa-clipboard-user"></i>
                         My Assigned Tasks
                     </button>
+                    <button class="nav-tab" data-section="completed-tasks">
+                        <i class="fas fa-check-double"></i>
+                        Completed Tasks
+                    </button>
                     <button class="nav-tab" data-section="due-dates">
                         <i class="fas fa-calendar-alt"></i>
                         Due Dates
@@ -2488,6 +2558,78 @@
                         </div>
                     </div>
                 </section>
+
+                <section id="completed-tasks" class="section">
+    <div class="section-header">
+        <h3>Completed Tasks</h3>
+        <div class="action-buttons">
+            <select id="completedTasksTypeFilter" class="form-select">
+                <option value="all">All Types</option>
+                <option value="job-auto">Job Auto</option>
+                <option value="manual">Manual</option>
+                <option value="admin">Admin</option>
+                <option value="super-admin">Super Admin</option>
+            </select>
+            <select id="completedTasksPeriodFilter" class="form-select">
+                <option value="7">Last 7 days</option>
+                <option value="30">Last 30 days</option>
+                <option value="90">Last 3 months</option>
+                <option value="365">Last year</option>
+            </select>
+            <button class="btn btn-secondary" id="refreshCompletedTasks">
+                <i class="fas fa-sync-alt"></i>
+                Refresh
+            </button>
+        </div>
+    </div>
+
+    <div class="completed-tasks-stats">
+        <div class="stat-card completed">
+            <div class="stat-header">
+                <div>
+                    <div class="stat-title">Completed</div>
+                    <div class="stat-number" id="completedStatsTotal">0</div>
+                    <div class="stat-change positive">
+                        <span id="completedStatsOnTime">0% on time</span>
+                    </div>
+                </div>
+                <div class="stat-icon completed">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-header">
+                <div>
+                    <div class="stat-title">Avg. Days</div>
+                    <div class="stat-number" id="completedStatsAvgDays">0</div>
+                    <div class="stat-change">
+                        <span>to complete</span>
+                    </div>
+                </div>
+                <div class="stat-icon">
+                    <i class="fas fa-calendar-alt"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="completedTasksContainer">
+        <div style="text-align: center; padding: 40px; color: #64748b;">
+            <div class="loading"></div>
+            <p>Loading completed tasks...</p>
+        </div>
+    </div>
+
+    <!-- Load More Button -->
+    <div class="load-more-container" style="display: none;">
+        <button class="btn btn-secondary" id="loadMoreCompletedTasks">
+            <i class="fas fa-plus"></i>
+            Load More Tasks
+        </button>
+    </div>
+</section>
+
 
                 <!-- Enhanced Analytics Section -->
                 <section id="analytics" class="section">
