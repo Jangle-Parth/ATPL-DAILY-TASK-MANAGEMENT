@@ -308,6 +308,7 @@ document.addEventListener('DOMContentLoaded', function () {
             // ADD THESE LINES TO UPDATE THE MAIN DASHBOARD:
             document.getElementById('totalTasks').textContent = stats.totalTasks || 0;
             document.getElementById('pendingTasks').textContent = stats.pendingTasks || 0;
+            document.getElementById('pendingApprovalTasks').textContent = stats.pendingApprovalTasks || 0; // NEW LINE
             document.getElementById('completedTasks').textContent = stats.completedTasks || 0;
             document.getElementById('overdueTasks').textContent = stats.overdueTasks || 0;
 
@@ -331,6 +332,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const totalTasks = tasks.length;
         const pendingTasks = tasks.filter(t => t.status === 'pending').length;
+        const pendingApprovalTasks = tasks.filter(t => t.status === 'pending_approval').length; // NEW LINE
         const completedTasks = tasks.filter(t => t.status === 'completed').length;
         const overdueTasks = tasks.filter(t => {
             const dueDate = new Date(t.dueDate);
@@ -341,6 +343,7 @@ document.addEventListener('DOMContentLoaded', function () {
         // Update the dashboard display
         document.getElementById('totalTasks').textContent = totalTasks;
         document.getElementById('pendingTasks').textContent = pendingTasks;
+        document.getElementById('pendingApprovalTasks').textContent = pendingApprovalTasks; // NEW LINE
         document.getElementById('completedTasks').textContent = completedTasks;
         document.getElementById('overdueTasks').textContent = overdueTasks;
     }

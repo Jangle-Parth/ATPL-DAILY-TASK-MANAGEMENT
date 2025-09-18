@@ -79,6 +79,10 @@
             flex-direction: column;
             min-height: 100vh;
         }
+    .quick-stats {
+        grid-template-columns: 1fr;
+    }
+
 
         /* Enhanced Header */
         .header {
@@ -118,6 +122,10 @@
     
     .nav-tabs::-webkit-scrollbar {
         display: none;
+    }
+
+    .quick-stats {
+        grid-template-columns: repeat(3, 1fr);
     }
     
     .user-info {
@@ -399,6 +407,14 @@
             gap: 1.5rem;
         }
 
+        .stat-card.pending-approval::before { 
+            background: #8b5cf6; /* Purple for pending approval */
+        }
+
+        .stat-card.pending-approval .stat-icon {
+            background: linear-gradient(135deg, #8b5cf6, #a78bfa);
+        }
+
         .stat-card {
             background: white;
             padding: 1.5rem;
@@ -643,11 +659,11 @@
         }
 
         .tasks-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); /* Smaller min-width */
-    gap: 1.25rem; /* Reduced gap */
-    max-width: 100%;
-}
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); /* Smaller min-width */
+            gap: 1.25rem; /* Reduced gap */
+            max-width: 100%;
+        }
 
         .task-card {
             background: white;
@@ -845,11 +861,11 @@
         }
 
         .analytics-overview {
-    display: grid;
-    grid-template-columns: 1fr; /* Single column layout */
-    gap: 1.5rem; /* Reduced gap */
-    margin-bottom: 2rem; /* Reduced margin */
-}
+            display: grid;
+            grid-template-columns: 1fr; /* Single column layout */
+            gap: 1.5rem; /* Reduced gap */
+            margin-bottom: 2rem; /* Reduced margin */
+        }
         .analytics-card {
             background: white;
             border-radius: var(--border-radius-lg);
@@ -885,117 +901,117 @@
         }
 
         .due-date-task-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    padding: 0.75rem;
-    margin-bottom: 0.5rem;
-    background: var(--gray-50);
-    border-radius: 8px;
-    border-left: 4px solid var(--info);
-    transition: all 0.2s ease;
-}
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            padding: 0.75rem;
+            margin-bottom: 0.5rem;
+            background: var(--gray-50);
+            border-radius: 8px;
+            border-left: 4px solid var(--info);
+            transition: all 0.2s ease;
+        }
 
-.due-date-task-item:hover {
-    background: white;
-    box-shadow: var(--shadow-sm);
-    transform: translateX(4px);
-}
+        .due-date-task-item:hover {
+            background: white;
+            box-shadow: var(--shadow-sm);
+            transform: translateX(4px);
+        }
 
-.due-date-task-item:last-child {
-    margin-bottom: 0;
-}
+        .due-date-task-item:last-child {
+            margin-bottom: 0;
+        }
 
-.due-date-task-content {
-    flex: 1;
-}
+        .due-date-task-content {
+            flex: 1;
+        }
 
-.due-date-task-title {
-    font-weight: 600;
-    color: var(--gray-900);
-    margin-bottom: 0.25rem;
-    font-size: 0.9rem;
-    line-height: 1.3;
-}
+        .due-date-task-title {
+            font-weight: 600;
+            color: var(--gray-900);
+            margin-bottom: 0.25rem;
+            font-size: 0.9rem;
+            line-height: 1.3;
+        }
 
-.due-date-task-meta {
-    font-size: 0.8rem;
-    color: var(--gray-600);
-    display: flex;
-    gap: 1rem;
-    flex-wrap: wrap;
-}
+        .due-date-task-meta {
+            font-size: 0.8rem;
+            color: var(--gray-600);
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
 
-.due-date-task-priority {
-    padding: 0.2rem 0.5rem;
-    border-radius: 12px;
-    font-size: 0.7rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    white-space: nowrap;
-}
+        .due-date-task-priority {
+            padding: 0.2rem 0.5rem;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
 
-/* Priority colors for due date tasks */
-.due-date-task-priority.low { background: #D1FAE5; color: #065F46; }
-.due-date-task-priority.medium { background: #FEF3C7; color: #92400E; }
-.due-date-task-priority.high { background: #FEE2E2; color: #991B1B; }
-.due-date-task-priority.urgent { background: #DC2626; color: white; }
+        /* Priority colors for due date tasks */
+        .due-date-task-priority.low { background: #D1FAE5; color: #065F46; }
+        .due-date-task-priority.medium { background: #FEF3C7; color: #92400E; }
+        .due-date-task-priority.high { background: #FEE2E2; color: #991B1B; }
+        .due-date-task-priority.urgent { background: #DC2626; color: white; }
 
-/* Adjust the chart container for due date sections */
-#due-dates .chart-container {
-    height: auto;
-    min-height: 200px;
-    max-height: 400px;
-    overflow-y: auto;
-    padding: 1rem;
-    background: white;
-}
+        /* Adjust the chart container for due date sections */
+        #due-dates .chart-container {
+            height: auto;
+            min-height: 200px;
+            max-height: 400px;
+            overflow-y: auto;
+            padding: 1rem;
+            background: white;
+        }
 
-/* Style the metric row for due dates */
-#due-dates .metric-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.75rem;
-    background: var(--gray-50);
-    border-radius: 8px;
-    margin-bottom: 1rem;
-    border-left: 4px solid var(--primary);
-}
+        /* Style the metric row for due dates */
+        #due-dates .metric-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem;
+            background: var(--gray-50);
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            border-left: 4px solid var(--primary);
+        }
 
-#due-dates .metric-label {
-    font-weight: 600;
-    color: var(--gray-700);
-}
+        #due-dates .metric-label {
+            font-weight: 600;
+            color: var(--gray-700);
+        }
 
-#due-dates .metric-value {
-    font-size: 1.5rem;
-    font-weight: 800;
-    color: var(--primary);
-}
+        #due-dates .metric-value {
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: var(--primary);
+        }
 
-/* Empty state for due date sections */
-.due-date-empty {
-    text-align: center;
-    padding: 2rem;
-    color: var(--gray-500);
-}
+        /* Empty state for due date sections */
+        .due-date-empty {
+            text-align: center;
+            padding: 2rem;
+            color: var(--gray-500);
+        }
 
-.due-date-empty i {
-    font-size: 2rem;
-    margin-bottom: 1rem;
-    opacity: 0.5;
-}
+        .due-date-empty i {
+            font-size: 2rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
 
-/* ENHANCED ANALYTICS STYLES - Add to your styles.css */
+        /* ENHANCED ANALYTICS STYLES - Add to your styles.css */
 
-/* Main Analytics Container */
-.enhanced-analytics-container {
-    max-width: 100%;
-    margin: 0;
-    padding: 0;
-    background: transparent;
-}
+        /* Main Analytics Container */
+        .enhanced-analytics-container {
+            max-width: 100%;
+            margin: 0;
+            padding: 0;
+            background: transparent;
+        }
 
 /* Summary Cards Grid */
 .analytics-summary-grid {
@@ -1675,6 +1691,11 @@
     .summary-card {
         padding: 1rem;
     }
+
+    .quick-stats {
+        grid-template-columns: 1fr;
+    }
+
     
     .summary-card .card-value {
         font-size: 2rem;
@@ -2218,6 +2239,22 @@
                                         </div>
                                         <div class="stat-icon pending">
                                             <i class="fas fa-clock"></i>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="stat-card pending-approval">
+                                    <div class="stat-header">
+                                        <div>
+                                            <div class="stat-title">Pending Approval</div>
+                                            <div class="stat-number" id="pendingApprovalTasks">0</div>
+                                            <div class="stat-change neutral">
+                                                <i class="fas fa-hourglass-half"></i>
+                                                Loading...
+                                            </div>
+                                        </div>
+                                        <div class="stat-icon pending-approval">
+                                            <i class="fas fa-clock-o"></i>
                                         </div>
                                     </div>
                                 </div>

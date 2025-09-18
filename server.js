@@ -165,7 +165,7 @@ async function createAutoTask(job, status, assignedToId) {
         }
 
         const taskData = {
-            title: flowInfo.nextTask || ` `,
+            title: flowInfo.nextTask,
             description: `Task for Job ${job.docNo} - ${job.customerName} (Item Code: ${job.itemCode}) `,
             assignedTo: [assignedToId],
             assignedBy: null, // System generated
@@ -2099,10 +2099,19 @@ app.get('/api/search', requireAuth, async (req, res) => {
 });
 
 // Dashboard Routes
-app.get('/api/dashboard/user', requireAuth, async (req, res) => {
+// Update your server.js dashboard endpoint to include pending_approval
+
+app.get('/api/dashboard', requireAuth, async (req, res) => {
     try {
-        const userId = req.userId;
-        const userTasks = await Task.find({ assignedTo: userId });
+        const userTasks = await Task.find({
+            $or: [
+                { assignedTo: req.userId },
+                { assignedTo: { $in: [req.userId] } }
+            ]
+        }).populate('assignedTo', 'name email department')
+            .populate('createdBy', 'name email')
+            .populate('jobId', 'docNo customerName')
+            .sort({ createdAt: -1 });
 
         const today = new Date();
         const tomorrow = new Date(today);
@@ -2118,6 +2127,7 @@ app.get('/api/dashboard/user', requireAuth, async (req, res) => {
             totalTasks: userTasks.length,
             pendingTasks: userTasks.filter(t => t.status === 'pending').length,
             completedTasks: userTasks.filter(t => t.status === 'completed').length,
+            pendingApprovalTasks: userTasks.filter(t => t.status === 'pending_approval').length, // NEW LINE
             dueToday: userTasks.filter(t => t.status === 'pending' && new Date(t.dueDate).toDateString() === today.toDateString()).length,
             dueTomorrow: userTasks.filter(t => t.status === 'pending' && new Date(t.dueDate).toDateString() === tomorrow.toDateString()).length,
             dueThisWeek: userTasks.filter(t => t.status === 'pending' && new Date(t.dueDate) <= thisWeekEnd).length,
@@ -2131,6 +2141,7 @@ app.get('/api/dashboard/user', requireAuth, async (req, res) => {
         res.status(500).json({ error: 'Error generating dashboard' });
     }
 });
+
 
 app.post('/api/email/test-daily-report', requireAuth, async (req, res) => {
     try {
