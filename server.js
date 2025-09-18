@@ -165,8 +165,8 @@ async function createAutoTask(job, status, assignedToId) {
         }
 
         const taskData = {
-            title: flowInfo.nextTask,
-            description: `Auto-generated task for Job ${job.docNo} - ${job.customerName} (Item Code: ${job.itemCode}) `,
+            title: flowInfo.nextTask || ` `,
+            description: `Task for Job ${job.docNo} - ${job.customerName} (Item Code: ${job.itemCode}) `,
             assignedTo: [assignedToId],
             assignedBy: null, // System generated
             priority: statusKey === 'hold' ? 'high' : 'medium',
