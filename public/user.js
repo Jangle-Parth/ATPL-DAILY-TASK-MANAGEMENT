@@ -753,7 +753,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     ${task.title}
                 </h4>
                 <div style="font-size: 0.7rem; color: #64748b; display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-                    <span>${task.type.toUpperCase()}</span>
+                    <span>${task.assignedBy ? task.assignedBy.username : 'job-auto'}</span>
                     <span style="color: ${priorityColors[task.priority]}; font-weight: 600;">${task.priority.toUpperCase()}</span>
                 </div>
             </div>
@@ -2036,6 +2036,131 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
     }
+
+    function setupTaskFormProtection() {
+        // For Admin Panel
+        const adminTaskForm = document.getElementById('addTaskForm');
+        if (adminTaskForm) {
+            adminTaskForm.addEventListener('submit', async function (e) {
+                e.preventDefault();
+
+                const submitButton = adminTaskForm.querySelector('button[type="submit"]');
+                if (!submitButton) return;
+
+                // Check if already submitting
+                if (submitButton.disabled) {
+                    showMessage('Please wait, task is being created...', 'warning');
+                    return false;
+                }
+
+                // Disable submit button and show loading state
+                const originalText = submitButton.textContent;
+                submitButton.disabled = true;
+                submitButton.textContent = 'Creating Task...';
+                submitButton.classList.add('loading');
+
+                try {
+                    await handleAddTask(e);
+                } finally {
+                    // Re-enable button after delay
+                    setTimeout(() => {
+                        submitButton.disabled = false;
+                        submitButton.textContent = originalText;
+                        submitButton.classList.remove('loading');
+                    }, 2000);
+                }
+
+                return false;
+            });
+        }
+
+        // For User Panel - Peer Task Assignment
+        const peerTaskForm = document.getElementById('assignPeerTaskForm');
+        if (peerTaskForm) {
+            peerTaskForm.addEventListener('submit', async function (e) {
+                e.preventDefault();
+
+                const submitButton = peerTaskForm.querySelector('button[type="submit"]');
+                if (!submitButton) return;
+
+                // Check if already submitting
+                if (submitButton.disabled) {
+                    showMessage('Please wait, task is being created...', 'warning');
+                    return false;
+                }
+
+                // Disable submit button and show loading state
+                const originalText = submitButton.textContent;
+                submitButton.disabled = true;
+                submitButton.textContent = 'Assigning Task...';
+                submitButton.classList.add('loading');
+
+                try {
+                    const formData = new FormData(peerTaskForm);
+                    const assignToSelect = document.getElementById('peerTaskAssignTo');
+                    const selectedUsers = Array.from(assignToSelect.selectedOptions).map(option => option.value);
+
+                    if (selectedUsers.length === 0) {
+                        showMessage('Please select at least one colleague to assign the task', 'error');
+                        return;
+                    }
+
+                    const taskData = {
+                        title: formData.get('title').trim(),
+                        description: formData.get('description').trim(),
+                        assignedTo: selectedUsers,
+                        priority: formData.get('priority'),
+                        dueDate: formData.get('dueDate')
+                    };
+
+                    const response = await fetch(`${API_URL}/tasks/assign-peer`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${localStorage.getItem('atpl_auth_token')}`
+                        },
+                        body: JSON.stringify(taskData)
+                    });
+
+                    const result = await response.json();
+
+                    if (response.ok) {
+                        if (result.type === 'DUPLICATE_TASK') {
+                            showMessage(`Duplicate prevented: ${result.error}`, 'warning');
+                        } else {
+                            showMessage('Task assigned successfully to colleagues', 'success');
+                            closeModal('assignPeerTaskModal');
+                            peerTaskForm.reset();
+                            if (typeof loadTasks === 'function') loadTasks();
+                        }
+                    } else {
+                        if (result.type === 'DUPLICATE_TASK') {
+                            showMessage(`Duplicate prevented: ${result.error}`, 'warning');
+                        } else {
+                            showMessage(result.error || 'Failed to assign task', 'error');
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error assigning task:', error);
+                    showMessage('Network error. Please try again.', 'error');
+                } finally {
+                    // Re-enable button after delay
+                    setTimeout(() => {
+                        submitButton.disabled = false;
+                        submitButton.textContent = originalText;
+                        submitButton.classList.remove('loading');
+                    }, 2000);
+                }
+
+                return false;
+            });
+        }
+    }
+
+    // Call this when DOM is ready
+    document.addEventListener('DOMContentLoaded', function () {
+        setTimeout(setupTaskFormProtection, 100); // Small delay to ensure forms are loaded
+    });
 
     // NEW: Create task card specifically for tasks assigned by current user
     function createMyAssignedTaskCard(task) {

@@ -255,6 +255,121 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    function setButtonLoading(button, isLoading, loadingText = 'Processing...') {
+        if (isLoading) {
+            button.disabled = true;
+            button.dataset.originalText = button.textContent;
+            button.textContent = loadingText;
+            button.classList.add('btn-loading');
+        } else {
+            button.disabled = false;
+            button.textContent = button.dataset.originalText || 'Submit';
+            button.classList.remove('btn-loading');
+            delete button.dataset.originalText;
+        }
+    }
+
+    function showGlobalLoading(text = 'Processing...', subtext = 'Please wait while we complete your request') {
+        document.getElementById('loadingText').textContent = text;
+        document.getElementById('loadingSubtext').textContent = subtext;
+        document.getElementById('loadingOverlay').classList.add('active');
+    }
+
+    function hideGlobalLoading() {
+        document.getElementById('loadingOverlay').classList.remove('active');
+    }
+
+    // Enhanced Toast Notification System
+    function showToast(message, type = 'success') {
+        // Remove existing toasts
+        document.querySelectorAll('.toast').forEach(toast => toast.remove());
+
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+        toast.textContent = message;
+
+        document.body.appendChild(toast);
+
+        setTimeout(() => toast.classList.add('show'), 100);
+        setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => toast.remove(), 300);
+        }, 3000);
+    }
+
+    // Inline Loading Functions
+    function showInlineLoader(elementId, text = 'Loading...') {
+        const element = document.getElementById(elementId);
+        if (element) {
+            element.innerHTML = `
+            <div class="inline-loader">
+                <div class="inline-spinner"></div>
+                <span>${text}</span>
+            </div>
+        `;
+            element.style.display = 'flex';
+        }
+    }
+
+    function hideInlineLoader(elementId) {
+        const element = document.getElementById(elementId);
+        if (element) {
+            element.style.display = 'none';
+        }
+    }
+
+    // List Loading Functions
+    function generateSkeletonLoading(rows = 5) {
+        return Array.from({ length: rows }, () => `
+        <div style="padding: 16px; border-bottom: 1px solid #e5e7eb;">
+            <div class="skeleton-loader wide"></div>
+            <div class="skeleton-loader medium" style="margin-top: 8px;"></div>
+            <div class="skeleton-loader narrow" style="margin-top: 4px;"></div>
+        </div>
+    `).join('');
+    }
+
+    function showListLoading(containerId, rows = 5) {
+        const container = document.getElementById(containerId);
+        if (container) {
+            container.innerHTML = generateSkeletonLoading(rows);
+        }
+    }
+
+    // Form Loading Functions
+    function setFormLoading(formId, isLoading) {
+        const form = document.getElementById(formId);
+        if (form) {
+            if (isLoading) {
+                form.classList.add('form-loading');
+            } else {
+                form.classList.remove('form-loading');
+            }
+        }
+    }
+
+    // Progress Bar Functions
+    function showProgressBar(containerId) {
+        const container = document.getElementById(containerId);
+        if (container) {
+            container.innerHTML = `
+            <div class="progress-bar">
+                <div class="progress-indeterminate"></div>
+            </div>
+        `;
+        }
+    }
+
+    function hideProgressBar(containerId) {
+        const container = document.getElementById(containerId);
+        if (container) {
+            const progressBar = container.querySelector('.progress-bar');
+            if (progressBar) {
+                progressBar.remove();
+            }
+        }
+    }
+
     function getCurrentUser() {
         const userInfo = localStorage.getItem('atpl_user_info');
         if (userInfo) {
@@ -291,6 +406,131 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         }
     }
+
+    function setupTaskFormProtection() {
+        // For Admin Panel
+        const adminTaskForm = document.getElementById('addTaskForm');
+        if (adminTaskForm) {
+            adminTaskForm.addEventListener('submit', async function (e) {
+                e.preventDefault();
+
+                const submitButton = adminTaskForm.querySelector('button[type="submit"]');
+                if (!submitButton) return;
+
+                // Check if already submitting
+                if (submitButton.disabled) {
+                    showMessage('Please wait, task is being created...', 'warning');
+                    return false;
+                }
+
+                // Disable submit button and show loading state
+                const originalText = submitButton.textContent;
+                submitButton.disabled = true;
+                submitButton.textContent = 'Creating Task...';
+                submitButton.classList.add('loading');
+
+                try {
+                    await handleAddTask(e);
+                } finally {
+                    // Re-enable button after delay
+                    setTimeout(() => {
+                        submitButton.disabled = false;
+                        submitButton.textContent = originalText;
+                        submitButton.classList.remove('loading');
+                    }, 2000);
+                }
+
+                return false;
+            });
+        }
+
+        // For User Panel - Peer Task Assignment
+        const peerTaskForm = document.getElementById('assignPeerTaskForm');
+        if (peerTaskForm) {
+            peerTaskForm.addEventListener('submit', async function (e) {
+                e.preventDefault();
+
+                const submitButton = peerTaskForm.querySelector('button[type="submit"]');
+                if (!submitButton) return;
+
+                // Check if already submitting
+                if (submitButton.disabled) {
+                    showMessage('Please wait, task is being created...', 'warning');
+                    return false;
+                }
+
+                // Disable submit button and show loading state
+                const originalText = submitButton.textContent;
+                submitButton.disabled = true;
+                submitButton.textContent = 'Assigning Task...';
+                submitButton.classList.add('loading');
+
+                try {
+                    const formData = new FormData(peerTaskForm);
+                    const assignToSelect = document.getElementById('peerTaskAssignTo');
+                    const selectedUsers = Array.from(assignToSelect.selectedOptions).map(option => option.value);
+
+                    if (selectedUsers.length === 0) {
+                        showMessage('Please select at least one colleague to assign the task', 'error');
+                        return;
+                    }
+
+                    const taskData = {
+                        title: formData.get('title').trim(),
+                        description: formData.get('description').trim(),
+                        assignedTo: selectedUsers,
+                        priority: formData.get('priority'),
+                        dueDate: formData.get('dueDate')
+                    };
+
+                    const response = await fetch(`${API_URL}/tasks/assign-peer`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${localStorage.getItem('atpl_auth_token')}`
+                        },
+                        body: JSON.stringify(taskData)
+                    });
+
+                    const result = await response.json();
+
+                    if (response.ok) {
+                        if (result.type === 'DUPLICATE_TASK') {
+                            showMessage(`Duplicate prevented: ${result.error}`, 'warning');
+                        } else {
+                            showMessage('Task assigned successfully to colleagues', 'success');
+                            closeModal('assignPeerTaskModal');
+                            peerTaskForm.reset();
+                            if (typeof loadTasks === 'function') loadTasks();
+                        }
+                    } else {
+                        if (result.type === 'DUPLICATE_TASK') {
+                            showMessage(`Duplicate prevented: ${result.error}`, 'warning');
+                        } else {
+                            showMessage(result.error || 'Failed to assign task', 'error');
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error assigning task:', error);
+                    showMessage('Network error. Please try again.', 'error');
+                } finally {
+                    // Re-enable button after delay
+                    setTimeout(() => {
+                        submitButton.disabled = false;
+                        submitButton.textContent = originalText;
+                        submitButton.classList.remove('loading');
+                    }, 2000);
+                }
+
+                return false;
+            });
+        }
+    }
+
+    // Call this when DOM is ready
+    document.addEventListener('DOMContentLoaded', function () {
+        setTimeout(setupTaskFormProtection, 100); // Small delay to ensure forms are loaded
+    });
 
     function makeDashboardStatsClickable() {
         // Add click handlers to stat cards
@@ -2742,9 +2982,15 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    // FIXED: Improved task approval function
     window.approveTask = async function (taskId) {
-        if (!confirm('Are you sure you want to approve this task?')) return;
+        const approveButton = document.querySelector(`button[onclick="approveTask('${taskId}')"]`);
+        const originalText = approveButton ? approveButton.textContent : 'Approve';
+
+        if (approveButton) {
+            approveButton.disabled = true;
+            approveButton.textContent = 'Approving...';
+            approveButton.classList.add('loading');
+        }
 
         try {
             const response = await fetch(`${API_URL}/tasks/${taskId}/approve`, {
@@ -2755,17 +3001,63 @@ document.addEventListener('DOMContentLoaded', function () {
             const result = await response.json();
 
             if (result.success) {
-                showMessage('Task approved successfully', 'success');
-                loadTasks(); // Reload to update UI
+                showMessage('Task approved successfully!', 'success');
+                loadTasks();
+                loadUpcomingDueDates();
             } else {
                 showMessage(result.error, 'error');
             }
         } catch (error) {
             console.error('Error approving task:', error);
-            showMessage('Error approving task', 'error');
+            showMessage('Error approving task. Please try again.', 'error');
+        } finally {
+            if (approveButton) {
+                approveButton.disabled = false;
+                approveButton.textContent = originalText;
+                approveButton.classList.remove('loading');
+            }
         }
     };
 
+    window.rejectTask = async function (taskId) {
+        const reason = prompt('Please provide a reason for rejection:');
+        if (!reason) return;
+
+        const rejectButton = document.querySelector(`button[onclick="rejectTask('${taskId}')"]`);
+        const originalText = rejectButton ? rejectButton.textContent : 'Reject';
+
+        if (rejectButton) {
+            rejectButton.disabled = true;
+            rejectButton.textContent = 'Rejecting...';
+            rejectButton.classList.add('loading');
+        }
+
+        try {
+            const response = await fetch(`${API_URL}/tasks/${taskId}/reject`, {
+                method: 'POST',
+                headers: getAuthHeaders(),
+                body: JSON.stringify({ reason })
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                showMessage('Task rejected successfully!', 'success');
+                loadTasks();
+            } else {
+                showMessage(result.error, 'error');
+            }
+        } catch (error) {
+            console.error('Error rejecting task:', error);
+            showMessage('Error rejecting task. Please try again.', 'error');
+        } finally {
+            if (rejectButton) {
+                rejectButton.disabled = false;
+                rejectButton.textContent = originalText;
+                rejectButton.classList.remove('loading');
+            }
+        }
+    };
     // Update leaderboard based on filters
     window.updateLeaderboard = async function () {
         const period = document.getElementById('leaderboardPeriod')?.value || '30';
@@ -2840,31 +3132,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     };
 
-    // NEW: Add reject task function
-    window.rejectTask = async function (taskId) {
-        const reason = prompt('Please provide a reason for rejection:');
-        if (!reason) return;
 
-        try {
-            const response = await fetch(`${API_URL}/tasks/${taskId}/reject`, {
-                method: 'POST',
-                headers: getAuthHeaders(),
-                body: JSON.stringify({ reason })
-            });
-
-            const result = await response.json();
-
-            if (result.success) {
-                showMessage('Task rejected successfully', 'success');
-                loadTasks();
-            } else {
-                showMessage(result.error, 'error');
-            }
-        } catch (error) {
-            console.error('Error rejecting task:', error);
-            showMessage('Error rejecting task', 'error');
-        }
-    };
 
     window.editTask = function (taskId) {
         showMessage('Edit functionality coming soon', 'info');
@@ -2902,24 +3170,41 @@ document.addEventListener('DOMContentLoaded', function () {
     };
 
     window.deleteTask = async function (taskId) {
-        if (!confirm('Are you sure you want to delete this task?')) return;
+        if (!confirm('Are you sure you want to delete this task?')) {
+            return;
+        }
 
-        try {
-            const response = await fetch(`${API_URL}/tasks/${taskId}`, {
-                method: 'DELETE',
-                headers: getAuthHeaders()
-            });
+        // Find the delete button and show loading
+        const deleteButton = document.querySelector(`button[onclick="deleteTask('${taskId}')"]`);
+        if (deleteButton) {
+            const originalText = deleteButton.textContent;
+            deleteButton.disabled = true;
+            deleteButton.textContent = 'Deleting...';
+            deleteButton.classList.add('loading');
 
-            const result = await response.json();
+            try {
+                const response = await fetch(`${API_URL}/tasks/${taskId}`, {
+                    method: 'DELETE',
+                    headers: getAuthHeaders()
+                });
 
-            if (result.success) {
-                showMessage('Task deleted successfully', 'success');
-                loadTasks();
-            } else {
-                showMessage(result.error, 'error');
+                const result = await response.json();
+
+                if (result.success) {
+                    showMessage('Task deleted successfully!', 'success');
+                    loadTasks();
+                } else {
+                    showMessage(result.error || 'Failed to delete task', 'error');
+                }
+            } catch (error) {
+                console.error('Error deleting task:', error);
+                showMessage('Error deleting task. Please try again.', 'error');
+            } finally {
+                // Reset button state
+                deleteButton.disabled = false;
+                deleteButton.textContent = originalText;
+                deleteButton.classList.remove('loading');
             }
-        } catch (error) {
-            showMessage('Error deleting task', 'error');
         }
     };
 
@@ -3230,30 +3515,39 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     async function handleAddTask(e) {
+
         e.preventDefault();
 
-        const formData = new FormData(e.target);
+        const submitButton = e.target.querySelector('button[type="submit"]');
+        const originalText = submitButton.textContent;
 
-        // Get selected users from the multiple select
-        const assignToSelect = document.getElementById('taskAssignTo');
-        const selectedUsers = Array.from(assignToSelect.selectedOptions).map(option => option.value);
-
-        if (selectedUsers.length === 0) {
-            showMessage('Please select at least one user to assign the task', 'error');
-            return;
-        }
-
-        const taskData = {
-            title: formData.get('title'),
-            description: formData.get('description'),
-            assignedTo: selectedUsers.includes('self') ?
-                selectedUsers.map(id => id === 'self' ? currentUser.id : id) :
-                selectedUsers,
-            priority: formData.get('priority'),
-            dueDate: formData.get('dueDate')
-        };
+        submitButton.disabled = true;
+        submitButton.textContent = 'Creating Task...';
+        submitButton.classList.add('loading');
 
         try {
+
+
+            const formData = new FormData(e.target);
+
+            // Get selected users from the multiple select
+            const assignToSelect = document.getElementById('taskAssignTo');
+            const selectedUsers = Array.from(assignToSelect.selectedOptions).map(option => option.value);
+
+            if (selectedUsers.length === 0) {
+                showMessage('Please select at least one user to assign the task', 'error');
+                return;
+            }
+
+            const taskData = {
+                title: formData.get('title'),
+                description: formData.get('description'),
+                assignedTo: selectedUsers.includes('self') ?
+                    selectedUsers.map(id => id === 'self' ? currentUser.id : id) :
+                    selectedUsers,
+                priority: formData.get('priority'),
+                dueDate: formData.get('dueDate')
+            };
             const response = await fetch(`${API_URL}/tasks`, {
                 method: 'POST',
                 headers: getAuthHeaders(),
@@ -3262,16 +3556,26 @@ document.addEventListener('DOMContentLoaded', function () {
 
             const result = await response.json();
 
-            if (result.success) {
+            if (response.ok) {
                 showMessage('Task created successfully', 'success');
                 closeModal('addTaskModal');
                 e.target.reset();
                 loadTasks();
             } else {
-                showMessage(result.error, 'error');
+                if (result.type === 'DUPLICATE_TASK') {
+                    showMessage(`Duplicate prevented: ${result.error}`, 'warning');
+                } else {
+                    showMessage(result.error || 'Failed to create task', 'error');
+                }
             }
         } catch (error) {
-            showMessage('Error creating task', 'error');
+            console.error('Error creating task:', error);
+            showMessage('Network error. Please try again.', 'error');
+        } finally {
+            // Reset button state
+            submitButton.disabled = false;
+            submitButton.textContent = originalText;
+            submitButton.classList.remove('loading');
         }
     }
 }); 

@@ -148,6 +148,22 @@ async function createAutoTask(job, status, assignedToId) {
             return null;
         }
 
+        const existingTask = await Task.findOne({
+            title: flowInfo.nextTask,
+            'jobDetails.docNo': job.docNo.toString(),
+            'jobDetails.itemCode': job.itemCode.toString(), // ADDED: Critical missing field
+            'jobDetails.customerName': job.customerName.toString(),
+            'jobDetails.currentStage': flowInfo.stage,
+            status: { $in: ['pending', 'pending_approval'] },
+            type: 'job-auto'
+
+        });
+
+        if (existingTask) {
+            console.log(`🚫 DUPLICATE PREVENTED: Job-auto task exists for ${job.docNo}-${job.itemCode} at ${flowInfo.stage}`);
+            return existingTask;
+        }
+
         const taskData = {
             title: flowInfo.nextTask,
             description: `Auto-generated task for Job ${job.docNo} - ${job.customerName} (Item Code: ${job.itemCode}) `,
@@ -173,6 +189,10 @@ async function createAutoTask(job, status, assignedToId) {
         await logActivity('AUTO_TASK_CREATED', 'system', `Auto task created for ${job.docNo} - ${flowInfo.nextTask}`);
         return task;
     } catch (error) {
+        if (error.code === 11000) {
+            console.log(`🚫 DB prevented duplicate job-auto task for ${job.docNo}-${job.itemCode}`);
+            return null;
+        }
         console.error('Error creating auto task:', error);
         return null;
     }
@@ -1329,7 +1349,32 @@ app.post('/api/tasks', requireAuth, async (req, res) => {
             return res.status(400).json({ error: 'All fields are required' });
         }
 
-        // Handle multiple assignees ONLY for manual tasks
+        const normalizedTitle = title.trim();
+        const normalizedDescription = description.trim();
+        const taskType = user.role === 'super-admin' ? 'super-admin' : (user.role === 'admin' ? 'admin' : 'user');
+        const taskDueDate = new Date(dueDate);
+
+        // CRITICAL FIX: Check for existing duplicate manual tasks
+        const existingTask = await Task.findOne({
+            title: normalizedTitle,
+            description: normalizedDescription,
+            assignedBy: req.userId,
+            type: taskType,
+            status: { $in: ['pending', 'pending_approval'] },
+            dueDate: {
+                $gte: new Date(taskDueDate.setHours(0, 0, 0, 0)),
+                $lte: new Date(taskDueDate.setHours(23, 59, 59, 999))
+            }
+        });
+
+        if (existingTask) {
+            return res.status(409).json({
+                error: `Duplicate task prevented: A similar task "${normalizedTitle}" already exists (ID: ${existingTask._id})`,
+                type: 'DUPLICATE_TASK',
+                existingTaskId: existingTask._id
+            });
+        }
+
         let assigneeIds = [];
         if (Array.isArray(assignedTo)) {
             assigneeIds = assignedTo.map(id => id === 'self' ? req.userId : id);
@@ -1337,32 +1382,46 @@ app.post('/api/tasks', requireAuth, async (req, res) => {
             assigneeIds = [assignedTo === 'self' ? req.userId : assignedTo];
         }
 
+        // Verify all assigned users exist
+        const validUsers = await User.find({ _id: { $in: assigneeIds } });
+        if (validUsers.length !== assigneeIds.length) {
+            return res.status(400).json({ error: 'One or more assigned users not found' });
+        }
+
+
         const taskData = {
-            title,
-            description,
+            title: normalizedTitle,
+            description: normalizedDescription,
             assignedTo: assigneeIds, // Multiple assignees for manual tasks
             assignedBy: req.userId,
             priority,
             status: 'pending',
-            type: user.role === 'super-admin' ? 'super-admin' : (user.role === 'admin' ? 'admin' : 'user'),
+            type: taskType,
             dueDate: new Date(dueDate),
             attachments: [],
             individualCompletions: assigneeIds.length > 1 ? [] : undefined // Only for multi-assignee
         };
 
         const task = await Task.create(taskData);
-        const assignees = await User.find({ _id: { $in: assigneeIds } });
-        for (const assignee of assignees) {
+        for (const assignee of validUsers) {
             await emailService.sendTaskAssignmentEmail(assignee, task, user);
         }
 
-        const assignedUsers = await User.find({ _id: { $in: assigneeIds } });
-        const usernames = assignedUsers.map(u => u.username).join(', ');
+        const usernames = validUsers.map(u => u.username).join(', ');
         await logActivity('TASK_CREATED', req.userId, `Created task: ${title} for ${usernames}`, req);
 
         res.json({ success: true, message: 'Task created successfully' });
     } catch (error) {
-        console.error('Error creating task:', error);
+        console.error('Error creating manual task:', error);
+
+        if (error.code === 11000) {
+            // MongoDB duplicate key error
+            return res.status(409).json({
+                error: 'Duplicate task prevented: A similar task already exists',
+                type: 'DUPLICATE_TASK'
+            });
+        }
+
         res.status(500).json({ error: 'Error creating task' });
     }
 });
