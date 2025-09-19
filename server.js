@@ -1340,7 +1340,6 @@ app.get('/api/tasks/debug', requireAdmin, async (req, res) => {
     }
 });
 
-// In server.js - Update ONLY manual task creation to support multiple assignees
 
 app.post('/api/tasks', requireAuth, async (req, res) => {
     try {
@@ -1405,9 +1404,7 @@ app.post('/api/tasks', requireAuth, async (req, res) => {
         };
 
         const task = await Task.create(taskData);
-        for (const assignee of validUsers) {
-            await emailService.sendTaskAssignmentEmail(assignee, task, user);
-        }
+
 
         const usernames = validUsers.map(u => u.username).join(', ');
         await logActivity('TASK_CREATED', req.userId, `Created task: ${title} for ${usernames}`, req);
@@ -1474,7 +1471,6 @@ app.post('/api/tasks/:id/complete', requireAuth, async (req, res) => {
 
             await task.save();
 
-            await emailService.sendTaskCompletionRequestEmail(task, completedByUser);
 
 
             // Create next task in job flow if needed
@@ -1525,7 +1521,6 @@ app.post('/api/tasks/:id/complete', requireAuth, async (req, res) => {
                     .filter(Boolean)
                     .join('; ');
 
-                await emailService.sendTaskCompletionRequestEmail(task, completedByUser);
             }
 
             await task.save();
@@ -1545,7 +1540,6 @@ app.post('/api/tasks/:id/complete', requireAuth, async (req, res) => {
         if (attachments) task.completionAttachments = attachments;
 
         await task.save();
-        await emailService.sendTaskCompletionRequestEmail(task, completedByUser);
 
         await logActivity('TASK_COMPLETED', req.userId, `Completed task: ${task.title} `, req);
         res.json({ success: true, message: 'Task submitted for approval' });
@@ -1573,7 +1567,6 @@ app.post('/api/email/test-completion-request', requireAuth, async (req, res) => 
             individualCompletions: []
         };
 
-        await emailService.sendTaskCompletionRequestEmail(mockTask, user);
         res.json({ success: true, message: 'Test completion request email sent to admins' });
     } catch (error) {
         console.error('Error sending test completion email:', error);
@@ -1643,9 +1636,7 @@ app.post('/api/tasks/assign-peer', requireAuth, async (req, res) => {
         });
 
         const task = await Task.create(taskData);
-        for (const assignee of assignees) {
-            await emailService.sendTaskAssignmentEmail(assignee, task, assignerUser);
-        }
+
 
         const usernames = assignees.map(u => u.username).join(', ');
         await logActivity('PEER_TASK_ASSIGNED', req.userId, `Assigned task: ${title} to ${usernames} `, req);
@@ -2473,8 +2464,6 @@ app.post('/api/email/test-daily-report', requireAuth, async (req, res) => {
             assignedTo: req.userId,
             status: { $in: ['pending', 'in_progress'] }
         });
-
-        await emailService.sendDailyTaskReport(user, pendingTasks);
         res.json({ success: true, message: 'Test daily report sent' });
     } catch (error) {
         res.status(500).json({ error: 'Error sending test email' });
@@ -2487,7 +2476,6 @@ app.post('/api/email/test-weekly-report', requireAuth, async (req, res) => {
         const cronService = require('./services/cronService');
         const performanceData = await cronService.calculateWeeklyPerformance(req.userId);
 
-        await emailService.sendWeeklyPerformanceReport(user, performanceData);
         res.json({ success: true, message: 'Test weekly report sent' });
     } catch (error) {
         res.status(500).json({ error: 'Error sending test email' });
@@ -2815,9 +2803,7 @@ app.put('/api/jobs/:id/status', requireAdmin, async (req, res) => {
 
         await job.save();
 
-        if (status.toLowerCase() === 'hold' || status.toLowerCase() === 'so cancelled') {
-            await emailService.sendJobStatusAlertToAllDepartments(job, status.toLowerCase());
-        }
+
 
         // Create auto-task for new status
         const statusKey = status.toLowerCase();
